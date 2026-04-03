@@ -1,0 +1,1 @@
+RAG is widely used in enterprise AI systems.

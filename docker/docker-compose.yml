@@ -1,0 +1,20 @@
+services:
+  mcp-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.mcp
+    ports:
+      - "8000:8000"
+    volumes:
+      - ..:/app
+    environment:
+      - RAG_BASE_URL=http://rag-engine:8001
+
+  rag-engine:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.rag
+    ports:
+      - "8002:8001"
+    volumes:
+      - ..:/app

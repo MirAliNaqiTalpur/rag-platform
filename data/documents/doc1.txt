@@ -1,0 +1,1 @@
+Retrieval-Augmented Generation (RAG) combines retrieval with text generation.

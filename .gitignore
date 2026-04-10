@@ -1,32 +1,70 @@
+# =========================
 # Python
+# =========================
 __pycache__/
-**/__pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# =========================
+# Virtual environments
+# =========================
 .venv/
 venv/
 env/
+ENV/
 
-# VS Code / OS
-.vscode/
-.DS_Store
-Thumbs.db
-
-# Terraform (root or nested)
-.terraform/
-*.tfstate
-*.tfstate.backup
-.terraform.lock.hcl
-terraform.tfvars
-
-# Secrets / local config
-*.env
+# =========================
+# Environment / Secrets
+# =========================
 .env
 .env.*
-terraform.tfvars
-mcp_config.json
+*.env
 
-# Build / generated artifacts
-data/faiss_index/
+# =========================
+# Logs
+# =========================
 *.log
+
+# =========================
+# OS / Editor junk
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# =========================
+# Data / Local artifacts
+# =========================
+data/faiss_index/
+data/chunks/
+*.faiss
+*.index
+
+# =========================
+# Terraform
+# =========================
+infra/terraform/.terraform/
+infra/terraform/terraform.tfstate
+infra/terraform/terraform.tfstate.*
+infra/terraform/terraform.tfvars
+infra/terraform/*.tfvars
+infra/terraform/*.tfplan
+
+# =========================
+# Docker (optional but safe)
+# =========================
+docker/*.log
+
+# =========================
+# Temporary files
+# =========================
+*.tmp
+*.bak
+*.swp

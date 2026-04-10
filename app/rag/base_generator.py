@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
+
 class BaseGenerator(ABC):
     @abstractmethod
-    def generate(self, query, documents):
+    def generate(self, query, documents, model_name=None):
         pass

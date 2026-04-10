@@ -8,9 +8,15 @@ class InMemoryStore(VectorStore):
         self.documents = []
         self.embeddings = []
 
+    def _doc_text(self, doc):
+        if isinstance(doc, dict):
+            return doc.get("text", "")
+        return str(doc)
+
     def add_documents(self, docs):
         self.documents = docs
-        self.embeddings = self.embedding_model.encode(docs).tolist()
+        texts = [self._doc_text(doc) for doc in docs]
+        self.embeddings = self.embedding_model.encode(texts).tolist()
 
     def search(self, query, top_k=3):
         query_vec = self.embedding_model.encode([query])[0]
@@ -24,11 +30,9 @@ class InMemoryStore(VectorStore):
         return [doc for score, doc in scored[:top_k]]
 
     def save(self, path="data/memory_store"):
-        # keep simple for now; no persistence
         pass
 
     def load(self, path="data/memory_store"):
-        # no-op for now
         pass
 
     def cosine_similarity(self, a, b):

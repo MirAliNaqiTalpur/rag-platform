@@ -1,41 +1,52 @@
 import os
+import json
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
+
 class FAISSStore:
     def __init__(self):
-        self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+        self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
         self.index = None
         self.documents = []
 
+    def _doc_text(self, doc):
+        if isinstance(doc, dict):
+            return doc.get("text", "")
+        return str(doc)
+
     def add_documents(self, docs):
-        embeddings = self.embedding_model.encode(docs)
+        texts = [self._doc_text(doc) for doc in docs]
+        embeddings = self.embedding_model.encode(texts)
         dim = embeddings.shape[1]
 
         self.index = faiss.IndexFlatL2(dim)
-        self.index.add(embeddings.astype("float32"))
+        self.index.add(np.array(embeddings, dtype="float32"))
 
         self.documents = docs
 
     def search(self, query, top_k=3):
         query_vec = self.embedding_model.encode([query])
-        D, I = self.index.search(query_vec.astype("float32"), top_k)
+        _, indices = self.index.search(np.array(query_vec, dtype="float32"), top_k)
 
-        return [self.documents[i] for i in I[0]]
-    
+        results = []
+        for i in indices[0]:
+            if 0 <= i < len(self.documents):
+                results.append(self.documents[i])
+        return results
+
     def save(self, path="data/faiss_index"):
         if not os.path.exists(path):
             os.makedirs(path)
 
         faiss.write_index(self.index, os.path.join(path, "index.faiss"))
 
-        with open(os.path.join(path, "docs.txt"), "w", encoding="utf-8") as f:
-            for doc in self.documents:
-                f.write(doc.replace("\n", " ") + "\n")
-                
+        with open(os.path.join(path, "docs.json"), "w", encoding="utf-8") as f:
+            json.dump(self.documents, f, ensure_ascii=False, indent=2)
+
     def load(self, path="data/faiss_index"):
         self.index = faiss.read_index(os.path.join(path, "index.faiss"))
 
-        with open(os.path.join(path, "docs.txt"), "r", encoding="utf-8") as f:
-            self.documents = f.readlines()
+        with open(os.path.join(path, "docs.json"), "r", encoding="utf-8") as f:
+            self.documents = json.load(f)

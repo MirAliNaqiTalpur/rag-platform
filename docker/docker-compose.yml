@@ -1,4 +1,25 @@
 services:
+  rag-engine:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.rag
+    ports:
+      - "8002:8001"
+    volumes:
+      - ..:/app
+      - ${APPDATA}/gcloud/application_default_credentials.json:/secrets/gcp-adc.json:ro
+    environment:
+      - VECTOR_STORE=${VECTOR_STORE}
+      - RETRIEVER=${RETRIEVER}
+      - RERANKER=${RERANKER}
+      - GENERATOR=${GENERATOR}
+      - DOCUMENT_SOURCE=${DOCUMENT_SOURCE}
+      - TOP_K=${TOP_K}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcp-adc.json
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
+      - GCP_PROJECT=${GCP_PROJECT}
+
   mcp-server:
     build:
       context: ..
@@ -9,12 +30,29 @@ services:
       - ..:/app
     environment:
       - RAG_BASE_URL=http://rag-engine:8001
+    depends_on:
+      - rag-engine
 
-  rag-engine:
+  streamlit-ui:
     build:
       context: ..
-      dockerfile: docker/Dockerfile.rag
+      dockerfile: docker/Dockerfile.ui
     ports:
-      - "8002:8001"
+      - "8501:8501"
     volumes:
       - ..:/app
+      - ${APPDATA}/gcloud/application_default_credentials.json:/secrets/gcp-adc.json:ro
+    environment:
+      - VECTOR_STORE=${VECTOR_STORE}
+      - RETRIEVER=${RETRIEVER}
+      - RERANKER=${RERANKER}
+      - GENERATOR=${GENERATOR}
+      - DOCUMENT_SOURCE=${DOCUMENT_SOURCE}
+      - TOP_K=${TOP_K}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - STREAMLIT_SERVER_FILE_WATCHER_TYPE=none
+      - GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcp-adc.json
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
+      - GCP_PROJECT=${GCP_PROJECT}
+    depends_on:
+      - rag-engine

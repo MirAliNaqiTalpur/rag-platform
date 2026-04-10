@@ -1,11 +1,22 @@
-from app.rag.engine import RAGEngine
-
-rag_engine = RAGEngine()
+from app.mcp.tools import dispatch_tool
 
 print("\n--- TEST: search_documents ---")
-search_result = rag_engine.search_only(query="What is RAG?", top_k=2)
+search_result = dispatch_tool(
+    "search_documents",
+    {"query": "What is RAG?", "top_k": 2}
+)
 print(search_result)
 
 print("\n--- TEST: answer_query ---")
-answer_result = rag_engine.query(query="What is RAG?", top_k=2)
+answer_result = dispatch_tool(
+    "answer_query",
+    {"query": "What is RAG?", "top_k": 2}
+)
 print(answer_result)
+
+print("\n--- TEST: search_by_metadata ---")
+metadata_result = dispatch_tool(
+    "search_by_metadata",
+    {"query": "policy", "category": "policy", "top_k": 5}
+)
+print(metadata_result)

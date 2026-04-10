@@ -2,21 +2,34 @@ from app.rag.engine import RAGEngine
 
 rag = RAGEngine()
 
-query = "What is RAG?"
-result = rag.query(query)
+queries = [
+    "What is RAG?",
+    "How does a RAG pipeline work?",
+    "How is RAG different from fine-tuning?",
+    "What are access control policies?",
+]
 
-print("\n--- FINAL OUTPUT ---")
+for query in queries:
+    result = rag.query(query)
 
-print("\nQuery:")
-print(result["query"])
+    print("\n" + "=" * 80)
+    print("Query:")
+    print(result["query"])
 
-print("\nRetrieved Docs:")
-for d in result["documents"]:
-    print("-", d.strip())
+    print("\nTop Retrieved Docs:")
+    for i, d in enumerate(result["documents"], start=1):
+        if isinstance(d, dict):
+            text = d.get("text", "").strip()
+            source = d.get("id", d.get("source", "unknown"))
+        else:
+            text = str(d).strip()
+            source = "unknown"
 
-print("\nGenerated Answer:")
-print(result["answer"])
+        short_text = text[:200].replace("\n", " ")
+        print(f"{i}. Source: {source}")
+        print(f"   Text: {short_text}")
+        print()
 
-print("\nLatency:")
-for k, v in result["latency"].items():
-    print(f"{k}: {v} sec")
+    print("Latency:")
+    for key, value in result["latency"].items():
+        print(f"{key}: {value} sec")

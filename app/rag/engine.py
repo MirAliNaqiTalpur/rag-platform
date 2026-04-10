@@ -4,6 +4,7 @@ from app.rag.reranker_registry import RerankerRegistry
 from app.rag.generator_registry import GeneratorRegistry
 from app.core.config import CONFIG
 
+
 class RAGEngine:
     def __init__(self):
         retriever_registry = RetrieverRegistry()
@@ -14,7 +15,13 @@ class RAGEngine:
         self.reranker = reranker_registry.get(CONFIG["reranker"])
         self.generator = generator_registry.get(CONFIG["generator"])
 
-    def query(self, user_query: str = None, query: str = None, top_k: int = None):
+    def query(
+        self,
+        user_query: str = None,
+        query: str = None,
+        top_k: int = None,
+        model_name: str = None
+    ):
         total_start = time.perf_counter()
 
         final_query = query if query is not None else user_query
@@ -33,7 +40,11 @@ class RAGEngine:
 
         generation_start = time.perf_counter()
         if self.generator:
-            answer = self.generator.generate(final_query, reranked_documents)
+            answer = self.generator.generate(
+                final_query,
+                reranked_documents,
+                model_name=model_name
+            )
         else:
             answer = "No generator configured"
         generation_time = time.perf_counter() - generation_start
@@ -51,7 +62,7 @@ class RAGEngine:
                 "total_seconds": round(total_time, 6),
             }
         }
-        
+
     def search_only(self, query: str, top_k: int = None):
         final_top_k = top_k if top_k is not None else CONFIG["top_k"]
 

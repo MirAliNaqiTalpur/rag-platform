@@ -1,1 +1,0 @@
-Cloud-agnostic systems are designed to run across multiple cloud providers.

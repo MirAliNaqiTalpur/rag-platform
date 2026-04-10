@@ -4,3 +4,6 @@ sentence-transformers
 faiss-cpu
 google-genai
 fastmcp
+pypdf
+streamlit
+google-cloud-storage

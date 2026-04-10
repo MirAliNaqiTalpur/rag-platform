@@ -1,17 +1,20 @@
 from app.core.config import CONFIG
-from app.ingestion.loader import load_documents
 from app.vectorstore.factory import get_vector_store
-
-docs = load_documents("data/documents")
-store = get_vector_store(CONFIG)
-
-store.add_documents(docs)
+from app.vectorstore.utils import initialize_store
 
 query = "What is RAG?"
-results = store.search(query, top_k=2)
+
+store = get_vector_store(CONFIG)
+store = initialize_store(store)
+
+results = store.search(query, top_k=CONFIG["top_k"])
 
 print(f"\nBackend: {CONFIG['vector_store']}")
 print(f"Query: {query}")
 print("Results:")
+
 for r in results:
-    print("-", r.strip())
+    if isinstance(r, dict):
+        print("-", r.get("text", "").strip())
+    else:
+        print("-", str(r).strip())

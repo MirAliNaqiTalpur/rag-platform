@@ -1,0 +1,1 @@
+Audit logging is the process of recording system activities to track changes and ensure accountability.

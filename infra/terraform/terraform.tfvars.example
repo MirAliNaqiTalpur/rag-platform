@@ -1,0 +1,28 @@
+project_id         = "your-gcp-project-id"
+region             = "asia-southeast1"
+
+artifact_repo_name = "rag-platform-repo"
+
+rag_service_name   = "rag-engine"
+mcp_service_name   = "mcp-server"
+ui_service_name    = "streamlit-ui"
+
+bucket_name        = "your-unique-bucket-name"
+documents_prefix   = "documents"
+faiss_index_prefix = "indexes/faiss"
+
+rag_container_image = "asia-southeast1-docker.pkg.dev/your-gcp-project-id/rag-platform-repo/rag-engine:latest"
+mcp_container_image = "asia-southeast1-docker.pkg.dev/your-gcp-project-id/rag-platform-repo/mcp-server:latest"
+ui_container_image  = "asia-southeast1-docker.pkg.dev/your-gcp-project-id/rag-platform-repo/streamlit-ui:latest"
+
+vector_store    = "faiss"
+retriever       = "hybrid"
+reranker        = "simple"
+generator       = "gemini"
+document_source = "gcs"
+top_k           = 3
+
+gemini_api_key = "replace-me"
+
+deploy_ui               = true
+allow_unauthenticated   = true

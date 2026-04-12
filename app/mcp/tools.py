@@ -1,15 +1,15 @@
-from typing import Any, Dict, List
+import os
+from typing import Any, Dict, List, Optional
 
-from app.rag.engine import RAGEngine
+import requests
+
 from app.mcp.schemas import (
     SearchRequest,
     AnswerRequest,
     MetadataSearchRequest,
 )
 
-
-def get_rag_engine():
-    return RAGEngine()
+RAG_BASE_URL = os.getenv("RAG_BASE_URL", "http://localhost:8001")
 
 
 def _normalize_documents(docs: List[Any]) -> List[Dict[str, Any]]:
@@ -34,9 +34,9 @@ def _normalize_documents(docs: List[Any]) -> List[Dict[str, Any]]:
 
 def _build_result(
     query: str,
-    answer: str = None,
-    documents: List[Any] = None,
-    latency: Dict[str, float] = None,
+    answer: Optional[str] = None,
+    documents: Optional[List[Any]] = None,
+    latency: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Any]:
     return {
         "status": "success",
@@ -47,9 +47,22 @@ def _build_result(
     }
 
 
+def _post_json(path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    url = f"{RAG_BASE_URL}{path}"
+    response = requests.post(url, json=payload, timeout=300)
+    response.raise_for_status()
+    return response.json()
+
+
 def search_documents(query: str, top_k: int = 3) -> Dict[str, Any]:
     req = SearchRequest(query=query, top_k=top_k)
-    result = get_rag_engine().search_only(query=req.query, top_k=req.top_k)
+    result = _post_json(
+        "/search",
+        {
+            "query": req.query,
+            "top_k": req.top_k,
+        },
+    )
 
     return _build_result(
         query=req.query,
@@ -60,10 +73,13 @@ def search_documents(query: str, top_k: int = 3) -> Dict[str, Any]:
 
 def answer_query(query: str, top_k: int = 3, model: str = None) -> Dict[str, Any]:
     req = AnswerRequest(query=query, top_k=top_k, model=model)
-    result = get_rag_engine().query(
-        query=req.query,
-        top_k=req.top_k,
-        model_name=req.model,
+    result = _post_json(
+        "/query",
+        {
+            "query": req.query,
+            "top_k": req.top_k,
+            "model": req.model,
+        },
     )
 
     return _build_result(
@@ -87,7 +103,13 @@ def search_by_metadata(
         top_k=top_k,
     )
 
-    result = get_rag_engine().search_only(query=req.query, top_k=req.top_k)
+    result = _post_json(
+        "/search",
+        {
+            "query": req.query,
+            "top_k": req.top_k,
+        },
+    )
     docs = result.get("documents", [])
 
     filtered_docs = []

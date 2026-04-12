@@ -1,55 +1,26 @@
-# =========================
-# Python
-# =========================
+# Secrets / local env
+.env
+.env.local
+
+# Python cache
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-*.so
-*.egg
-*.egg-info/
-dist/
-build/
 
-# =========================
-# Virtual environments
-# =========================
-.venv/
-venv/
-env/
-ENV/
+# Generated index files
+data/faiss_index/
+faiss_index/
 
-# =========================
-# Environment / Secrets
-# =========================
-.env
-.env.*
-*.env
+# Local artifacts
+tree.txt
+Important-commands.txt
 
-# =========================
-# Logs
-# =========================
-*.log
-
-# =========================
-# OS / Editor junk
-# =========================
+# OS/editor noise
 .DS_Store
 Thumbs.db
 .vscode/
-.idea/
 
-# =========================
-# Data / Local artifacts
-# =========================
-data/faiss_index/
-data/chunks/
-*.faiss
-*.index
 
-# =========================
 # Terraform
-# =========================
 infra/terraform/.terraform/
 infra/terraform/terraform.tfstate
 infra/terraform/terraform.tfstate.*

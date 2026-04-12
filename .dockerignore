@@ -1,23 +1,50 @@
-__pycache__/
-**/__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
+# Git / local metadata
 .git/
 .gitignore
-.vscode/
+
+# Secrets / local env
+.env
+.env.local
+.env.*
+!.env.example
+
+# Python cache / build artifacts
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
 .venv/
+venv/
 env/
-node_modules/
 
-infra/
-docker/
-scripts/
-evaluation/
+# OS / editor noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
 
-mcp_config.json
-rag_platform_folder_tree.txt
-README.md
+# Local notes / temporary files
+tree.txt
+Important-commands.txt
+*.log
+*.tmp
+*.bak
+*.swp
 
+# Generated retrieval/index artifacts
 data/faiss_index/
+faiss_index/
+
+# Terraform local state artifacts
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.*
+infra/terraform/*.tfplan
+infra/terraform/terraform.tfvars

@@ -8,17 +8,12 @@ services:
     volumes:
       - ..:/app
       - ${APPDATA}/gcloud/application_default_credentials.json:/secrets/gcp-adc.json:ro
+    env_file:
+    - ../.env.local
     environment:
-      - VECTOR_STORE=${VECTOR_STORE}
-      - RETRIEVER=${RETRIEVER}
-      - RERANKER=${RERANKER}
-      - GENERATOR=${GENERATOR}
-      - DOCUMENT_SOURCE=${DOCUMENT_SOURCE}
-      - TOP_K=${TOP_K}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcp-adc.json
-      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
-      - GCP_PROJECT=${GCP_PROJECT}
+
+
 
   mcp-server:
     build:
@@ -42,17 +37,11 @@ services:
     volumes:
       - ..:/app
       - ${APPDATA}/gcloud/application_default_credentials.json:/secrets/gcp-adc.json:ro
+    env_file:
+      - ../.env.local 
     environment:
-      - VECTOR_STORE=${VECTOR_STORE}
-      - RETRIEVER=${RETRIEVER}
-      - RERANKER=${RERANKER}
-      - GENERATOR=${GENERATOR}
-      - DOCUMENT_SOURCE=${DOCUMENT_SOURCE}
-      - TOP_K=${TOP_K}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - STREAMLIT_SERVER_FILE_WATCHER_TYPE=none
       - GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcp-adc.json
-      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
-      - GCP_PROJECT=${GCP_PROJECT}
+
     depends_on:
       - rag-engine

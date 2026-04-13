@@ -80,10 +80,11 @@ resource "google_storage_bucket_iam_member" "runtime_bucket_access" {
 }
 
 resource "google_cloud_run_v2_service" "rag_engine" {
-  name     = var.rag_service_name
-  location = var.region
-  project  = var.project_id
-  ingress  = "INGRESS_TRAFFIC_ALL"
+  name                = var.rag_service_name
+  location            = var.region
+  project             = var.project_id
+  ingress             = "INGRESS_TRAFFIC_ALL"
+  deletion_protection = false
 
   template {
     service_account = google_service_account.runtime.email
@@ -182,10 +183,11 @@ resource "google_cloud_run_v2_service_iam_member" "rag_public" {
 }
 
 resource "google_cloud_run_v2_service" "mcp_server" {
-  name     = var.mcp_service_name
-  location = var.region
-  project  = var.project_id
-  ingress  = "INGRESS_TRAFFIC_ALL"
+  name                = var.mcp_service_name
+  location            = var.region
+  project             = var.project_id
+  ingress             = "INGRESS_TRAFFIC_ALL"
+  deletion_protection = false
 
   template {
     service_account = google_service_account.runtime.email
@@ -228,11 +230,12 @@ resource "google_cloud_run_v2_service_iam_member" "mcp_public" {
 }
 
 resource "google_cloud_run_v2_service" "streamlit_ui" {
-  count    = var.deploy_ui ? 1 : 0
-  name     = var.ui_service_name
-  location = var.region
-  project  = var.project_id
-  ingress  = "INGRESS_TRAFFIC_ALL"
+  count               = var.deploy_ui ? 1 : 0
+  name                = var.ui_service_name
+  location            = var.region
+  project             = var.project_id
+  ingress             = "INGRESS_TRAFFIC_ALL"
+  deletion_protection = false
 
   template {
     service_account = google_service_account.runtime.email

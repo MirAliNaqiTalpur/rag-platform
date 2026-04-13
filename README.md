@@ -1,5 +1,7 @@
 # Modular MCP-Enabled RAG Platform
 
+> A cloud-agnostic, modular RAG infrastructure platform with MCP integration, designed for reproducible deployment using Docker and Terraform.
+
 A production-oriented, modular Retrieval-Augmented Generation (RAG) platform with a Model Context Protocol (MCP) server interface, pluggable retrieval and reranking strategies, interchangeable vector backends, and Terraform-based cloud deployment.
 
 ## Project overview
@@ -20,39 +22,49 @@ The current implementation is validated for:
 
 The design goal is to keep core application logic cloud-agnostic while treating infrastructure providers as adapters.
 
+## Current validated progress vs proposal milestones
+
+**Status:** Month 1 and Month 2 milestone goals have been substantially implemented and validated. Month 3 evaluation and final handoff work is ongoing.
+
+This repository reflects validated progress across local, Docker, and GCP Cloud Run deployments using Terraform, ensuring reproducible and cloud-agnostic behavior.
+
+### Month 1: Core architecture and infrastructure — completed / validated
+
+- Modular separation between RAG engine, MCP server, UI, and storage layers  
+- Docker-based local orchestration (Docker Compose)  
+- Terraform-based GCP deployment (Cloud Run + GCS)  
+- Configuration-driven runtime behavior using environment variables  
+- Local and GCS-backed document source switching  
+- Reproducible infrastructure setup using Terraform  
+
+### Month 2: MCP integration and modular RAG components — completed / validated
+
+- MCP-compatible tool exposure for search and query workflows  
+- Pluggable retrieval and reranking configuration  
+- Metadata-aware retrieval support  
+- Runtime dataset reload via API and UI  
+- Cloud validation of:
+  - default deployed GCS bucket usage  
+  - optional UI override for bucket and prefix  
+- Cross-environment validation (local → Docker → Cloud Run)  
+
+### Month 3: Evaluation and finalization — in progress
+
+Planned work:
+
+- Evaluation framework for retrieval quality  
+- Metrics: Recall@K, Precision@K, MRR  
+- Strategy comparison across configurations  
+- Experiment tracking and logging  
+- Final deployment and handoff documentation  
+
+### Summary
+
+The system already satisfies the core architectural, modularity, and deployment requirements. Remaining work focuses on evaluation, measurement, and final delivery polish.
+
 ## Internship alignment
 
 This project was developed to satisfy the internship objective of designing and implementing a production-ready, modular RAG platform with MCP integration, backend portability, pluggable retrieval strategies, and deployment reproducibility.
-
-### Month 1 milestone focus: Core architecture and infrastructure
-
-Implemented and validated:
-
-- service separation between MCP server, RAG engine, UI, and storage-backed document flow
-- Docker-based local orchestration
-- Terraform-based GCP deployment structure
-- configuration-driven runtime behavior through environment variables
-- local and GCS-backed document source switching
-- backend-aligned Cloud Run configuration for deployed default GCS bucket usage
-
-### Month 2 milestone focus: MCP integration and modular RAG components
-
-Implemented and validated:
-
-- MCP tool exposure for search and query workflows
-- strategy-based retriever and reranker selection
-- metadata-aware retrieval support
-- runtime model selection support in the UI and backend
-- cross-service validation across local, Docker, and Cloud Run
-
-### Month 3 milestone focus: Evaluation and finalization
-
-Planned / partially scaffolded:
-
-- reproducible evaluation workflow
-- metric reporting for retrieval quality
-- experiment comparison across configurations
-- deployment handoff documentation and onboarding workflow
 
 ## Current architecture
 
@@ -134,7 +146,7 @@ data/
 ### 1. Clone the repository
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/MirAliNaqiTalpur/rag-platform.git
 cd rag-platform
 ```
 

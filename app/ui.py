@@ -283,14 +283,17 @@ with st.sidebar:
     gcs_prefix = ""
 
     if document_source == "gcs":
-        gcs_bucket_name = st.text_input(
-            "GCS Bucket",
-            value=os.getenv("GCS_BUCKET_NAME", ""),
-        )
-        gcs_prefix = st.text_input(
-            "Prefix",
-            value=os.getenv("GCS_PREFIX", ""),
-        )
+      gcs_bucket_name = st.text_input(
+        "GCS Bucket (optional)",
+        value="",
+        help="Leave empty to use the default bucket configured during deployment.",
+    )
+
+    gcs_prefix = st.text_input(
+        "Prefix (optional)",
+        value="",
+        help="Optional folder path inside the bucket. Leave empty to use the default prefix.",
+    )
 
     refresh_clicked = st.button("Load / Refresh Dataset", use_container_width=True)
 
@@ -331,10 +334,14 @@ with st.sidebar:
                 final_model=final_model,
                 available_models=model_options,
             )
+
+            backend_message = result.get("message", "Dataset loaded successfully.")
             st.success(
-                f"Dataset loaded from '{result.get('document_source')}'. "
-                f"Documents indexed: {result.get('total_documents_loaded', 0)}"
+                f"{backend_message} "
+                f"(Source: '{result.get('document_source')}', "
+                f"Documents indexed: {result.get('total_documents_loaded', 0)})"
             )
+
         except Exception as e:
             st.error(f"Dataset refresh failed: {e}")
 

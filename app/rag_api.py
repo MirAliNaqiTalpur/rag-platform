@@ -1,14 +1,15 @@
 import os
 import shutil
 from functools import lru_cache
+from typing import Any
 
-from fastapi import FastAPI, HTTPException
 from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
 
 from app.core.config import CONFIG
-from app.rag.engine import RAGEngine
-from app.mcp.schemas import AnswerRequest
 from app.ingestion.loader import load_documents
+from app.mcp.schemas import AnswerRequest
+from app.rag.engine import RAGEngine
 from app.vectorstore.factory import get_vector_store
 
 load_dotenv(".env.local")
@@ -24,7 +25,7 @@ def get_rag() -> RAGEngine:
     return RAGEngine()
 
 
-def _get_model_config():
+def _get_model_config() -> dict[str, Any]:
     raw_models = os.getenv("AVAILABLE_MODELS", "").strip()
 
     if not raw_models:
@@ -46,7 +47,7 @@ def _get_model_config():
         available_models.insert(0, default_model)
 
     seen = set()
-    unique_models = []
+    unique_models: list[str] = []
     for model in available_models:
         if model not in seen:
             seen.add(model)
@@ -60,30 +61,53 @@ def _get_model_config():
     }
 
 
-def _update_runtime_config(payload: dict) -> None:
-    document_source = payload.get("document_source", os.getenv("DOCUMENT_SOURCE", "local"))
-    gcs_bucket_name = payload.get("gcs_bucket_name", os.getenv("GCS_BUCKET_NAME", ""))
-    gcs_prefix = payload.get("gcs_prefix", os.getenv("GCS_PREFIX", ""))
+def _get_nonempty_string(payload: dict, key: str, default: str = "") -> str:
+    value = payload.get(key)
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value.strip()
+    return str(value)
 
-    vector_store = payload.get("vector_store", os.getenv("VECTOR_STORE", "faiss"))
-    retriever = payload.get("retriever", os.getenv("RETRIEVER", "hybrid"))
-    reranker = payload.get("reranker", os.getenv("RERANKER", "simple"))
-    generator = payload.get("generator", os.getenv("GENERATOR", "gemini"))
-    top_k = int(payload.get("top_k", os.getenv("TOP_K", 3)))
 
-    default_model = payload.get("default_model", os.getenv("DEFAULT_MODEL", "gemini-3.1-flash-lite-preview"))
-    available_models = payload.get("available_models", os.getenv("AVAILABLE_MODELS", default_model))
+def _update_runtime_config(payload: dict) -> dict[str, str | int]:
+    document_source = _get_nonempty_string(
+        payload, "document_source", os.getenv("DOCUMENT_SOURCE", "local")
+    ).lower()
+
+    vector_store = _get_nonempty_string(
+        payload, "vector_store", os.getenv("VECTOR_STORE", "faiss")
+    )
+    retriever = _get_nonempty_string(
+        payload, "retriever", os.getenv("RETRIEVER", "hybrid")
+    )
+    reranker = _get_nonempty_string(
+        payload, "reranker", os.getenv("RERANKER", "simple")
+    )
+    generator = _get_nonempty_string(
+        payload, "generator", os.getenv("GENERATOR", "gemini")
+    )
+
+    top_k_raw = payload.get("top_k")
+    top_k = int(top_k_raw) if top_k_raw not in (None, "") else int(os.getenv("TOP_K", "3"))
+
+    default_model = _get_nonempty_string(
+        payload,
+        "default_model",
+        os.getenv("DEFAULT_MODEL", "gemini-3.1-flash-lite-preview"),
+    )
+    available_models = _get_nonempty_string(
+        payload,
+        "available_models",
+        os.getenv("AVAILABLE_MODELS", default_model),
+    )
 
     os.environ["DOCUMENT_SOURCE"] = document_source
-    os.environ["GCS_BUCKET_NAME"] = gcs_bucket_name
-    os.environ["GCS_PREFIX"] = gcs_prefix
-
     os.environ["VECTOR_STORE"] = vector_store
     os.environ["RETRIEVER"] = retriever
     os.environ["RERANKER"] = reranker
     os.environ["GENERATOR"] = generator
     os.environ["TOP_K"] = str(top_k)
-
     os.environ["DEFAULT_MODEL"] = default_model
     os.environ["AVAILABLE_MODELS"] = available_models
 
@@ -92,6 +116,21 @@ def _update_runtime_config(payload: dict) -> None:
     CONFIG["reranker"] = reranker
     CONFIG["generator"] = generator
     CONFIG["top_k"] = top_k
+
+    return {
+        "document_source": document_source,
+        "top_k": top_k,
+    }
+
+
+def _set_gcs_runtime_config(bucket_name: str, prefix: str) -> None:
+    os.environ["GCS_BUCKET_NAME"] = bucket_name
+    os.environ["GCS_PREFIX"] = prefix
+
+
+def _clear_gcs_runtime_config() -> None:
+    os.environ.pop("GCS_BUCKET_NAME", None)
+    os.environ.pop("GCS_PREFIX", None)
 
 
 def _rebuild_vector_store() -> int:
@@ -115,23 +154,64 @@ def _rebuild_vector_store() -> int:
 
 
 @app.get("/health")
-def health():
+def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
 @app.get("/models")
-def get_models():
+def get_models() -> dict[str, Any]:
     return _get_model_config()
 
 
 @app.post("/reload-dataset")
-def reload_dataset(payload: dict):
+def reload_dataset(payload: dict) -> dict[str, Any]:
     try:
-        _update_runtime_config(payload)
-        total_docs = _rebuild_vector_store()
+        deployed_default_bucket = os.getenv("GCS_BUCKET_NAME", "").strip()
+        deployed_default_prefix = os.getenv("GCS_PREFIX", "").strip()
 
-        # Clear cached engine so next request uses the new source/index/config
+        runtime = _update_runtime_config(payload)
+        document_source = runtime["document_source"]
+
+        if document_source == "gcs":
+            gcs_bucket_name = _get_nonempty_string(payload, "gcs_bucket_name", "")
+            gcs_prefix = _get_nonempty_string(payload, "gcs_prefix", "")
+
+            if gcs_bucket_name:
+                resolved_bucket = gcs_bucket_name
+                resolved_prefix = gcs_prefix
+                bucket_message = f"Using GCS bucket from UI: '{resolved_bucket}'."
+            else:
+                resolved_bucket = deployed_default_bucket
+                resolved_prefix = deployed_default_prefix
+
+                if not resolved_bucket:
+                    _clear_gcs_runtime_config()
+                    get_rag.cache_clear()
+                    return {
+                        "status": "success",
+                        "document_source": "gcs",
+                        "gcs_bucket_name": "",
+                        "gcs_prefix": "",
+                        "total_documents_loaded": 0,
+                        "message": "GCS source selected, but no bucket was provided and no default deployed bucket is configured.",
+                    }
+
+                bucket_message = f"Using default deployed GCS bucket: '{resolved_bucket}'."
+
+            _set_gcs_runtime_config(resolved_bucket, resolved_prefix)
+
+        else:
+            _clear_gcs_runtime_config()
+            bucket_message = ""
+
+        total_docs = _rebuild_vector_store()
         get_rag.cache_clear()
+
+        message = (
+            f"{bucket_message} Dataset loaded successfully."
+            if total_docs > 0
+            else f"{bucket_message} No documents found in selected source."
+        ).strip()
 
         return {
             "status": "success",
@@ -139,10 +219,10 @@ def reload_dataset(payload: dict):
             "gcs_bucket_name": os.getenv("GCS_BUCKET_NAME", ""),
             "gcs_prefix": os.getenv("GCS_PREFIX", ""),
             "total_documents_loaded": total_docs,
-            "message": "Dataset loaded successfully." if total_docs > 0 else "No documents found in selected source.",
+            "message": message,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Dataset reload failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Dataset reload failed: {e}") from e
 
 
 @app.post("/query")

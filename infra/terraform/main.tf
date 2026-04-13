@@ -137,12 +137,12 @@ resource "google_cloud_run_v2_service" "rag_engine" {
       }
 
       env {
-        name  = "GCS_BUCKET"
+        name  = "GCS_BUCKET_NAME"
         value = google_storage_bucket.documents.name
       }
 
       env {
-        name  = "DOCUMENTS_PREFIX"
+        name  = "GCS_PREFIX"
         value = var.documents_prefix
       }
 
@@ -286,12 +286,12 @@ resource "google_cloud_run_v2_service" "streamlit_ui" {
       }
 
       env {
-        name  = "GCS_BUCKET"
+        name  = "GCS_BUCKET_NAME"
         value = google_storage_bucket.documents.name
       }
 
       env {
-        name  = "DOCUMENTS_PREFIX"
+        name  = "GCS_PREFIX"
         value = var.documents_prefix
       }
 
@@ -306,7 +306,7 @@ resource "google_cloud_run_v2_service" "streamlit_ui" {
       }
 
       env {
-        name  = "RAG_BASE_URL"
+        name  = "RAG_API_URL"
         value = google_cloud_run_v2_service.rag_engine.uri
       }
 

@@ -1,1 +1,0 @@
-A typical RAG pipeline includes document ingestion, embedding generation, vector storage, retrieval, optional reranking, and final answer generation using a language model.

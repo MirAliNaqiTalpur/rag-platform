@@ -1,1 +1,0 @@
-Access control policies define how users are granted or denied access to resources in a system based on roles and permissions.

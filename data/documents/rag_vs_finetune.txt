@@ -1,1 +1,0 @@
-RAG differs from fine-tuning because it retrieves external knowledge dynamically instead of storing knowledge inside model weights.

@@ -5,6 +5,11 @@ WORKDIR /app
 COPY requirements-rag.txt .
 RUN pip install --no-cache-dir -r requirements-rag.txt
 
+# Pre-bake the sentence-transformer model to avoid runtime HF download issues
+ENV HF_HOME=/root/.cache/huggingface
+ENV SENTENCE_TRANSFORMERS_HOME=/root/.cache/torch/sentence_transformers
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+
 COPY app/ app/
 COPY data/documents/ data/documents/
 

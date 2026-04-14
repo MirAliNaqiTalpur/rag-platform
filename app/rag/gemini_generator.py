@@ -1,6 +1,17 @@
 import os
+
 from google import genai
+from google.genai import errors as genai_errors
+
 from app.rag.base_generator import BaseGenerator
+
+
+class ModelBusyError(Exception):
+    pass
+
+
+class UpstreamModelError(Exception):
+    pass
 
 
 class GeminiGenerator(BaseGenerator):
@@ -74,9 +85,19 @@ Answer:
 
         chosen_model = self.resolve_model(model_name)
 
-        response = self.client.models.generate_content(
-            model=chosen_model,
-            contents=prompt
-        )
+        try:
+            response = self.client.models.generate_content(
+                model=chosen_model,
+                contents=prompt,
+            )
+            return response.text if response.text else "No response returned by Gemini."
 
-        return response.text if response.text else "No response returned by Gemini."
+        except genai_errors.ServerError as e:
+            message = str(e)
+            if "503" in message or "UNAVAILABLE" in message:
+                raise ModelBusyError(
+                    f"Gemini model '{chosen_model}' is temporarily experiencing high demand. Please try again shortly or switch to another model."
+                ) from e
+            raise UpstreamModelError(
+                f"Gemini server error while using model '{chosen_model}'."
+            ) from e

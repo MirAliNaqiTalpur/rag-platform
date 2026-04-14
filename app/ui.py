@@ -10,8 +10,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import streamlit as st
 from google.cloud import storage
 
-from app.storage.factory import get_storage_backend
-
 LOCAL_DOCUMENTS_DIR = "data/documents"
 RAG_API_URL = os.getenv("RAG_API_URL", "http://rag-engine:8001").rstrip("/")
 
@@ -283,17 +281,17 @@ with st.sidebar:
     gcs_prefix = ""
 
     if document_source == "gcs":
-      gcs_bucket_name = st.text_input(
-        "GCS Bucket (optional)",
-        value="",
-        help="Leave empty to use the default bucket configured during deployment.",
-    )
+        gcs_bucket_name = st.text_input(
+            "GCS Bucket (optional)",
+            value="",
+            help="Leave empty to use the default bucket configured during deployment.",
+        )
 
-    gcs_prefix = st.text_input(
-        "Prefix (optional)",
-        value="",
-        help="Optional folder path inside the bucket. Leave empty to use the default prefix.",
-    )
+        gcs_prefix = st.text_input(
+            "Prefix (optional)",
+            value="",
+            help="Optional folder path inside the bucket. Leave empty to use the default prefix.",
+        )
 
     refresh_clicked = st.button("Load / Refresh Dataset", use_container_width=True)
 
@@ -375,7 +373,42 @@ if run_query or run_search:
                     },
                     timeout=300,
                 )
-                response.raise_for_status()
+
+                if response.status_code == 503:
+                    try:
+                        detail = response.json().get("detail", "")
+                    except Exception:
+                        detail = ""
+                    st.warning(
+                        detail
+                        or "The selected Gemini model is temporarily under high demand. Please try again shortly or choose another model."
+                    )
+                    st.stop()
+
+                if response.status_code == 400:
+                    try:
+                        detail = response.json().get("detail", "")
+                    except Exception:
+                        detail = ""
+                    st.error(detail or "Invalid query or model configuration.")
+                    st.stop()
+
+                if response.status_code == 502:
+                    try:
+                        detail = response.json().get("detail", "")
+                    except Exception:
+                        detail = ""
+                    st.error(detail or "Upstream model service error.")
+                    st.stop()
+
+                if response.status_code >= 400:
+                    try:
+                        detail = response.json().get("detail", "")
+                    except Exception:
+                        detail = response.text
+                    st.error(f"Query failed: {detail or f'HTTP {response.status_code}'}")
+                    st.stop()
+
                 result = response.json()
 
                 st.subheader("Generated Answer")
@@ -397,7 +430,15 @@ if run_query or run_search:
                     json={"query": query, "top_k": top_k},
                     timeout=300,
                 )
-                response.raise_for_status()
+
+                if response.status_code >= 400:
+                    try:
+                        detail = response.json().get("detail", "")
+                    except Exception:
+                        detail = response.text
+                    st.error(f"Search failed: {detail or f'HTTP {response.status_code}'}")
+                    st.stop()
+
                 result = response.json()
 
                 if "latency" in result:
@@ -406,5 +447,9 @@ if run_query or run_search:
 
                 render_documents(result.get("documents", []))
 
+        except requests.exceptions.Timeout:
+            st.error("The backend request timed out.")
+        except requests.exceptions.ConnectionError:
+            st.error("Could not connect to the backend service.")
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"Unexpected UI error: {e}")

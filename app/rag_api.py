@@ -11,6 +11,7 @@ from app.ingestion.loader import load_documents
 from app.mcp.schemas import AnswerRequest
 from app.rag.engine import RAGEngine
 from app.vectorstore.factory import get_vector_store
+from app.rag.gemini_generator import ModelBusyError, UpstreamModelError
 
 load_dotenv(".env.local")
 
@@ -158,9 +159,29 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/ready")
+def ready() -> dict[str, str]:
+    cache_info = get_rag.cache_info()
+    if cache_info.currsize > 0:
+        return {"status": "ready"}
+    raise HTTPException(
+        status_code=503,
+        detail="RAG engine is not warmed yet. Call /warmup or reload the dataset first."
+    )
+
+
 @app.get("/models")
 def get_models() -> dict[str, Any]:
     return _get_model_config()
+
+
+@app.post("/warmup")
+def warmup() -> dict[str, str]:
+    try:
+        get_rag()
+        return {"status": "ok", "message": "RAG engine initialized successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Warmup failed: {e}") from e
 
 
 @app.post("/reload-dataset")
@@ -206,6 +227,7 @@ def reload_dataset(payload: dict) -> dict[str, Any]:
 
         total_docs = _rebuild_vector_store()
         get_rag.cache_clear()
+        get_rag()
 
         message = (
             f"{bucket_message} Dataset loaded successfully."
@@ -228,11 +250,28 @@ def reload_dataset(payload: dict) -> dict[str, Any]:
 @app.post("/query")
 def query_docs(request: AnswerRequest):
     rag = get_rag()
-    return rag.query(
-        query=request.query,
-        top_k=request.top_k,
-        model_name=request.model,
-    )
+
+    try:
+        return rag.query(
+            query=request.query,
+            top_k=request.top_k,
+            model_name=request.model,
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    except ModelBusyError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    except UpstreamModelError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal query error: {e}"
+        ) from e
 
 
 @app.post("/search")

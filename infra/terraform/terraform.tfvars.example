@@ -26,3 +26,5 @@ gemini_api_key = "replace-me"
 
 deploy_ui               = true
 allow_unauthenticated   = true
+
+allow_custom_models = true

@@ -118,3 +118,9 @@ variable "deploy_ui" {
   type        = bool
   default     = true
 }
+
+variable "allow_custom_models" {
+  description = "Whether to allow custom model names in the UI and backend"
+  type        = bool
+  default     = true
+}

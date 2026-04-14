@@ -157,6 +157,11 @@ resource "google_cloud_run_v2_service" "rag_engine" {
         value = var.gemini_api_key
       }
 
+      env {
+        name  = "ALLOW_CUSTOM_MODELS"
+        value = tostring(var.allow_custom_models)
+      }
+
       resources {
         limits = {
           cpu    = "1"

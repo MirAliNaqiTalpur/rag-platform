@@ -5,6 +5,11 @@ from app.rag.generator_registry import GeneratorRegistry
 from app.core.config import CONFIG
 
 
+def to_ms(seconds: float) -> float:
+    """Convert seconds to milliseconds with sensible precision."""
+    return round(seconds * 1000, 2)
+
+
 class RAGEngine:
     def __init__(self):
         retriever_registry = RetrieverRegistry()
@@ -20,7 +25,7 @@ class RAGEngine:
         user_query: str = None,
         query: str = None,
         top_k: int = None,
-        model_name: str = None
+        model_name: str = None,
     ):
         total_start = time.perf_counter()
 
@@ -43,7 +48,7 @@ class RAGEngine:
             answer = self.generator.generate(
                 final_query,
                 reranked_documents,
-                model_name=model_name
+                model_name=model_name,
             )
         else:
             answer = "No generator configured"
@@ -56,23 +61,35 @@ class RAGEngine:
             "documents": reranked_documents,
             "answer": answer,
             "latency": {
-                "retrieval_seconds": round(retrieval_time, 6),
-                "reranking_seconds": round(rerank_time, 6),
-                "generation_seconds": round(generation_time, 6),
-                "total_seconds": round(total_time, 6),
-            }
+                "retrieval_ms": to_ms(retrieval_time),
+                "reranking_ms": to_ms(rerank_time),
+                "generation_ms": to_ms(generation_time),
+                "total_ms": to_ms(total_time),
+            },
         }
 
     def search_only(self, query: str, top_k: int = None):
         final_top_k = top_k if top_k is not None else CONFIG["top_k"]
 
+        retrieval_start = time.perf_counter()
         documents = self.retriever.retrieve(query, top_k=final_top_k)
+        retrieval_time = time.perf_counter() - retrieval_start
+
+        rerank_start = time.perf_counter()
         if self.reranker:
             reranked_documents = self.reranker.rerank(query, documents)
         else:
             reranked_documents = documents
+        rerank_time = time.perf_counter() - rerank_start
+
+        total_time = retrieval_time + rerank_time
 
         return {
             "query": query,
-            "documents": reranked_documents
+            "documents": reranked_documents,
+            "latency": {
+                "retrieval_ms": to_ms(retrieval_time),
+                "reranking_ms": to_ms(rerank_time),
+                "total_ms": to_ms(total_time),
+            },
         }

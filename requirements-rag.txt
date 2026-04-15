@@ -8,3 +8,4 @@ google-genai
 pypdf
 google-cloud-storage
 python-dotenv
+chromadb

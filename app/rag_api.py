@@ -10,8 +10,8 @@ from app.core.config import CONFIG
 from app.ingestion.loader import load_documents
 from app.mcp.schemas import AnswerRequest
 from app.rag.engine import RAGEngine
-from app.vectorstore.factory import get_vector_store
 from app.rag.gemini_generator import ModelBusyError, UpstreamModelError
+from app.vectorstore.factory import get_vector_store
 
 load_dotenv(".env.local")
 
@@ -19,6 +19,7 @@ app = FastAPI()
 
 LOCAL_DOCUMENTS_DIR = "data/documents"
 FAISS_INDEX_DIR = "data/faiss_index"
+CHROMA_STORE_DIR = "/tmp/chroma_store"
 
 
 @lru_cache(maxsize=1)
@@ -78,7 +79,7 @@ def _update_runtime_config(payload: dict) -> dict[str, str | int]:
 
     vector_store = _get_nonempty_string(
         payload, "vector_store", os.getenv("VECTOR_STORE", "faiss")
-    )
+    ).lower()
     retriever = _get_nonempty_string(
         payload, "retriever", os.getenv("RETRIEVER", "hybrid")
     )
@@ -120,6 +121,7 @@ def _update_runtime_config(payload: dict) -> dict[str, str | int]:
 
     return {
         "document_source": document_source,
+        "vector_store": vector_store,
         "top_k": top_k,
     }
 
@@ -134,9 +136,22 @@ def _clear_gcs_runtime_config() -> None:
     os.environ.pop("GCS_PREFIX", None)
 
 
+def _clear_vector_store_artifacts() -> None:
+    vector_store = CONFIG.get("vector_store", os.getenv("VECTOR_STORE", "faiss")).lower()
+
+    if vector_store == "faiss":
+        if os.path.exists(FAISS_INDEX_DIR):
+            shutil.rmtree(FAISS_INDEX_DIR)
+
+
+
+    elif vector_store == "memory":
+        # Nothing persisted on disk for memory store.
+        pass
+
+
 def _rebuild_vector_store() -> int:
-    if os.path.exists(FAISS_INDEX_DIR):
-        shutil.rmtree(FAISS_INDEX_DIR)
+    _clear_vector_store_artifacts()
 
     docs = load_documents(LOCAL_DOCUMENTS_DIR)
 
@@ -149,6 +164,7 @@ def _rebuild_vector_store() -> int:
     try:
         store.save()
     except Exception:
+        # Some stores may persist automatically or not require explicit save.
         pass
 
     return len(docs)
@@ -166,7 +182,7 @@ def ready() -> dict[str, str]:
         return {"status": "ready"}
     raise HTTPException(
         status_code=503,
-        detail="RAG engine is not warmed yet. Call /warmup or reload the dataset first."
+        detail="RAG engine is not warmed yet. Call /warmup or reload the dataset first.",
     )
 
 
@@ -211,6 +227,7 @@ def reload_dataset(payload: dict) -> dict[str, Any]:
                     return {
                         "status": "success",
                         "document_source": "gcs",
+                        "vector_store": os.getenv("VECTOR_STORE", "faiss"),
                         "gcs_bucket_name": "",
                         "gcs_prefix": "",
                         "total_documents_loaded": 0,
@@ -226,6 +243,8 @@ def reload_dataset(payload: dict) -> dict[str, Any]:
             bucket_message = ""
 
         total_docs = _rebuild_vector_store()
+
+        # Recreate engine after backend/source/runtime config changes.
         get_rag.cache_clear()
         get_rag()
 
@@ -238,6 +257,7 @@ def reload_dataset(payload: dict) -> dict[str, Any]:
         return {
             "status": "success",
             "document_source": os.getenv("DOCUMENT_SOURCE", "local"),
+            "vector_store": os.getenv("VECTOR_STORE", "faiss"),
             "gcs_bucket_name": os.getenv("GCS_BUCKET_NAME", ""),
             "gcs_prefix": os.getenv("GCS_PREFIX", ""),
             "total_documents_loaded": total_docs,
@@ -270,7 +290,7 @@ def query_docs(request: AnswerRequest):
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Internal query error: {e}"
+            detail=f"Internal query error: {e}",
         ) from e
 
 

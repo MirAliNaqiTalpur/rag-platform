@@ -10,18 +10,18 @@ A production-oriented, modular Retrieval-Augmented Generation (RAG) platform wit
 
 This repository implements a cloud-agnostic RAG infrastructure layer designed for reusable deployment across document-centric AI systems. The platform is built around four separable concerns:
 
-* **MCP server** for protocol-based tool exposure to LLM agents
-* **RAG engine** for retrieval, reranking, and answer generation orchestration
-* **Vector storage abstraction** for switching between vector backends
-* **Evaluation-ready structure** for reproducible experimentation
+- **MCP server** for protocol-based tool exposure to LLM agents
+- **RAG engine** for retrieval, reranking, and answer generation orchestration
+- **Vector storage abstraction** for switching between vector backends
+- **Evaluation-ready structure** for reproducible experimentation
 
 The current implementation is validated for:
 
-* local execution
-* Docker Compose deployment
-* GCP Cloud Run deployment using Terraform
-* GCS-backed document loading and runtime dataset switching
-* GCS-backed FAISS index persistence
+- local execution
+- Docker Compose deployment
+- GCP Cloud Run deployment using Terraform
+- GCS-backed document loading and runtime dataset switching
+- GCS-backed FAISS index persistence
 
 ---
 
@@ -31,25 +31,25 @@ The current implementation is validated for:
 
 ### Month 1: Core architecture — completed
 
-* modular separation of services
-* Docker-based local setup
-* Terraform-based GCP deployment
-* configuration-driven behavior
-* cloud portability (local → Docker → Cloud Run)
+- modular separation of services
+- Docker-based local setup
+- Terraform-based GCP deployment
+- configuration-driven behavior
+- cloud portability (local → Docker → Cloud Run)
 
 ### Month 2: MCP + modular RAG — completed
 
-* MCP tool exposure
-* pluggable retrieval + reranking
-* runtime dataset reload
-* GCS-backed document loading
-* vector backend switching (FAISS / Chroma)
+- MCP tool exposure
+- pluggable retrieval + reranking
+- runtime dataset reload
+- GCS-backed document loading
+- vector backend switching (FAISS / Chroma)
 
 ### Month 3: Evaluation — pending
 
-* Recall@K, Precision@K, MRR
-* strategy comparison
-* experiment tracking
+- Recall@K, Precision@K, MRR
+- strategy comparison
+- experiment tracking
 
 ---
 
@@ -58,26 +58,22 @@ The current implementation is validated for:
 ### Services
 
 1. **rag-engine**
-
-   * loads documents from local or GCS
-   * builds vector index
-   * serves `/query`, `/search`, `/models`, `/reload-dataset`
+   - loads documents from local or GCS
+   - builds vector index
+   - serves `/query`, `/search`, `/models`, `/reload-dataset`, and `/restore-index`
 
 2. **mcp-server**
-
-   * exposes retrieval tools via MCP
-   * delegates to rag-engine
+   - exposes retrieval tools via MCP
+   - delegates to rag-engine
 
 3. **streamlit-ui**
-
-   * UI for querying, search, dataset reload
-   * supports default GCS bucket with override
+   - UI for querying, search, dataset reload
+   - supports default GCS bucket with override
 
 4. **storage layer**
-
-   * GCS for documents
-   * FAISS index persisted to GCS
-   * Chroma backend for modular switching
+   - GCS for documents
+   - FAISS index persisted to GCS
+   - Chroma backend for modular switching
 
 ---
 
@@ -87,9 +83,9 @@ The platform supports interchangeable vector backends through a unified abstract
 
 ### FAISS (primary backend)
 
-* used for cloud deployment
-* index artifacts stored in GCS
-* enables stateless Cloud Run services
+- used for cloud deployment
+- index artifacts stored in GCS
+- enables stateless Cloud Run services
 
 Stored at:
 
@@ -99,14 +95,14 @@ gs://<bucket>/indexes/faiss/
 
 Artifacts:
 
-* `index.faiss`
-* `docs.json`
+- `index.faiss`
+- `docs.json`
 
 ### Chroma (secondary backend)
 
-* used to demonstrate backend modularity
-* switchable via configuration
-* not the primary cloud persistence backend
+- used to demonstrate backend modularity
+- switchable via configuration
+- not the primary cloud persistence backend
 
 ### Persistence flow
 
@@ -117,26 +113,26 @@ gs://<bucket>/documents/
 ```
 
 2. FAISS index is built
-3. Index saved locally inside container
-4. Uploaded to:
+3. Index is saved locally inside the container
+4. Index artifacts are uploaded to:
 
 ```text
 gs://<bucket>/indexes/faiss/
 ```
 
-5. Index can be restored via API
+5. The index can be restored through the API
 
 ---
 
 ## Restore endpoint
 
-Restore FAISS index from GCS:
+Restore the FAISS index from GCS:
 
 ```bash
 curl -X POST <RAG_URL>/restore-index
 ```
 
-Response:
+Expected response:
 
 ```json
 {
@@ -169,14 +165,14 @@ data/
 
 ## Features
 
-* modular RAG pipeline
-* MCP integration
-* FAISS + Chroma backend switching
-* GCS-backed documents
-* FAISS persistence to GCS
-* runtime dataset reload
-* Terraform deployment
-* Streamlit UI
+- modular RAG pipeline
+- MCP integration
+- FAISS + Chroma backend switching
+- GCS-backed documents
+- FAISS persistence to GCS
+- runtime dataset reload
+- Terraform deployment
+- Streamlit UI
 
 ---
 
@@ -184,35 +180,39 @@ data/
 
 ### Core variables
 
-* `VECTOR_STORE`
-* `RETRIEVER`
-* `RERANKER`
-* `GENERATOR`
-* `DOCUMENT_SOURCE`
-* `TOP_K`
+- `VECTOR_STORE`
+- `RETRIEVER`
+- `RERANKER`
+- `GENERATOR`
+- `DOCUMENT_SOURCE`
+- `TOP_K`
 
-### GCS / persistence
+### GCS / persistence variables
 
-* `GCS_BUCKET_NAME`
-* `GCS_PREFIX`
-* `INDEX_STORAGE`
-* `GCS_INDEX_BUCKET`
-* `GCS_INDEX_PREFIX`
+- `GCS_BUCKET_NAME`
+- `GCS_PREFIX`
+- `INDEX_STORAGE`
+- `GCS_INDEX_BUCKET`
+- `GCS_INDEX_PREFIX`
 
 ---
 
 ## Local development
+
+Clone the repository:
 
 ```bash
 git clone https://github.com/MirAliNaqiTalpur/rag-platform.git
 cd rag-platform
 ```
 
+Create a local environment file:
+
 ```bash
 cp .env.example .env.local
 ```
 
-Set:
+Set at least:
 
 ```env
 GEMINI_API_KEY=your_key
@@ -220,7 +220,7 @@ VECTOR_STORE=faiss
 DOCUMENT_SOURCE=local
 ```
 
-Run:
+Run locally with Docker Compose:
 
 ```bash
 docker compose -f docker/docker-compose.yml up --build
@@ -243,6 +243,7 @@ docker push asia-southeast1-docker.pkg.dev/<PROJECT_ID>/<REPO>/mcp-server:latest
 
 docker build --no-cache -f docker/Dockerfile.ui -t asia-southeast1-docker.pkg.dev/<PROJECT_ID>/<REPO>/streamlit-ui:latest .
 docker push asia-southeast1-docker.pkg.dev/<PROJECT_ID>/<REPO>/streamlit-ui:latest
+```
 
 ### Terraform setup
 
@@ -258,19 +259,36 @@ Example:
 project_id = "your-project-id"
 region     = "asia-southeast1"
 
+artifact_repo_name = "rag-platform-repo"
+
+rag_service_name = "rag-engine"
+mcp_service_name = "mcp-server"
+ui_service_name  = "streamlit-ui"
+
 bucket_name         = "your-bucket"
 documents_prefix    = "documents"
 faiss_index_prefix  = "indexes/faiss"
 
+rag_container_image = "asia-southeast1-docker.pkg.dev/your-project-id/rag-platform-repo/rag-engine:latest"
+mcp_container_image = "asia-southeast1-docker.pkg.dev/your-project-id/rag-platform-repo/mcp-server:latest"
+ui_container_image  = "asia-southeast1-docker.pkg.dev/your-project-id/rag-platform-repo/streamlit-ui:latest"
+
 vector_store    = "faiss"
+retriever       = "hybrid"
+reranker        = "simple"
+generator       = "gemini"
 document_source = "gcs"
 
-gemini_secret_name = "gemini-api-key"
+top_k = 3
+
+gemini_secret_name    = "gemini-api-key"
+allow_unauthenticated = true
+deploy_ui             = true
 ```
 
----
+### Deploy
 
-## Deploy
+Run validation before applying infrastructure:
 
 ```bash
 cd infra/terraform
@@ -282,26 +300,38 @@ terraform apply
 
 ---
 
-## Validation checklist
+## Post-deployment validation checklist
 
-* rag-engine `/health` works
-* UI loads
-* reload dataset works
-* GCS contains:
+Verify the following after deployment:
 
-  * `documents/`
-  * `indexes/faiss/`
-* `/restore-index` works
-* FAISS query works
-* Chroma switch works
+- `rag-engine` `/health` works
+- UI loads successfully
+- reload dataset works
+- GCS contains:
+  - `documents/`
+  - `indexes/faiss/`
+- `/restore-index` works
+- FAISS query works
+- Chroma backend can be selected and queried
+
+---
+
+## Destroying cloud infrastructure
+
+To simulate a clean delivery and redeployment cycle:
+
+```bash
+cd infra/terraform
+terraform destroy
+```
 
 ---
 
 ## Limitations
 
-* UI is minimal
-* Chroma not used as persistent cloud backend
-* evaluation framework not yet implemented
+- UI is minimal and operational, not a production front-end
+- Chroma is not currently used as the primary persistent cloud backend
+- the evaluation framework is not yet fully implemented
 
 ---
 
@@ -309,8 +339,8 @@ terraform apply
 
 This system demonstrates a modular, cloud-agnostic RAG architecture where:
 
-* core logic is independent of cloud provider
-* infrastructure is provisioned via Terraform
-* vector index persistence is externalized from container lifecycle
+- core logic is independent of cloud provider
+- infrastructure is provisioned via Terraform
+- vector index persistence is externalized from the container lifecycle
 
 This satisfies the internship objective of building a reusable RAG infrastructure layer.

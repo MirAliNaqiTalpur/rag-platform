@@ -9,6 +9,7 @@ __pycache__/
 # Generated index files
 data/faiss_index/
 faiss_index/
+data/chroma_store/
 
 # Local artifacts
 tree.txt

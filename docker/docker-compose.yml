@@ -23,6 +23,8 @@ services:
       - "8000:8000"
     volumes:
       - ..:/app
+    env_file:
+    - ../.env.local
     environment:
       - RAG_BASE_URL=http://rag-engine:8001
     depends_on:

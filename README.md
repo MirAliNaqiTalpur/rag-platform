@@ -230,6 +230,107 @@ docker compose -f docker/docker-compose.yml up --build
 
 ## Cloud deployment (GCP)
 
+### GCP Project Setup
+
+Create a new GCP project:
+
+```bash
+gcloud projects create YOUR-PROJECT-ID --name="rag-platform-prod"
+```
+
+Set the project as active:
+
+```bash
+gcloud config set project YOUR-PROJECT-ID
+```
+
+Verify active project:
+
+```bash
+gcloud config list
+```
+
+(Optional but recommended) ensure Application Default Credentials (ADC) use the correct quota project:
+
+```bash
+gcloud auth application-default set-quota-project YOUR-PROJECT-ID
+```
+
+---
+
+### Link Billing Account
+
+A billing account must be linked before enabling services:
+
+```bash
+gcloud billing accounts list
+```
+
+Link the project to a billing account:
+
+```bash
+gcloud billing projects link YOUR-PROJECT-ID --billing-account=YOUR-BILLING-ACCOUNT-ID
+```
+
+Verify billing is enabled:
+
+```bash
+gcloud beta billing projects describe YOUR-PROJECT-ID
+```
+
+---
+
+### Enable Required APIs
+
+```bash
+gcloud services enable \
+  run.googleapis.com \
+  artifactregistry.googleapis.com \
+  cloudbuild.googleapis.com \
+  secretmanager.googleapis.com \
+  iam.googleapis.com
+```
+
+---
+
+### Create Artifact Registry
+
+```bash
+gcloud artifacts repositories create rag-platform-repo \
+  --repository-format=docker \
+  --location=asia-southeast1 \
+  --description="RAG platform images"
+```
+
+---
+
+### Configure Docker Authentication
+
+```bash
+gcloud auth configure-docker asia-southeast1-docker.pkg.dev
+```
+
+---
+
+### Configure Gemini API Key (Secret Manager)
+
+Create a secret:
+
+```bash
+echo -n "YOUR_GEMINI_API_KEY" | gcloud secrets create gemini-api-key --data-file=-
+```
+
+If the secret already exists:
+
+```bash
+echo -n "YOUR_GEMINI_API_KEY" | gcloud secrets versions add gemini-api-key --data-file=-
+```
+
+---
+
+> Note:
+> - Ensure Docker images are built and pushed before running Terraform
+> - Ensure the Gemini API key secret exists before deployment
 ### Build and push images
 
 From the repository root:

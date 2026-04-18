@@ -90,10 +90,10 @@ variable "top_k" {
   default     = 3
 }
 
-variable "gemini_api_key" {
-  description = "Gemini API key for initial deployment"
+variable "gemini_secret_name" {
+  description = "Secret Manager secret name containing the Gemini API key"
   type        = string
-  sensitive   = true
+  default     = "gemini-api-key"
 }
 
 variable "allow_unauthenticated" {

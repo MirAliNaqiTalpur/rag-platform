@@ -179,7 +179,7 @@ st.info("Gemini-powered RAG system with configurable retrieval, dataset source, 
 with st.sidebar:
     st.header("Configuration")
 
-    vector_store_options = ["faiss", "memory"]
+    vector_store_options = ["faiss", "chroma", "memory"]
     default_vector_store = os.getenv("VECTOR_STORE", "faiss").lower()
     vector_store_index = (
         vector_store_options.index(default_vector_store)

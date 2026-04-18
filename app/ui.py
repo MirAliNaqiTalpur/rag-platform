@@ -1,14 +1,14 @@
 import os
 import sys
+
 import requests
+import streamlit as st
 from dotenv import load_dotenv
+from google.cloud import storage
 
 load_dotenv(".env.local")
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-import streamlit as st
-from google.cloud import storage
 
 LOCAL_DOCUMENTS_DIR = "data/documents"
 RAG_API_URL = os.getenv("RAG_API_URL", "http://rag-engine:8001").rstrip("/")
@@ -277,21 +277,21 @@ with st.sidebar:
         index=document_source_index,
     )
 
-    gcs_bucket_name = ""
-    gcs_prefix = ""
+    gcs_bucket_name = os.getenv("GCS_BUCKET_NAME", "").strip()
+    gcs_prefix = os.getenv("GCS_PREFIX", "").strip()
 
     if document_source == "gcs":
         gcs_bucket_name = st.text_input(
             "GCS Bucket (optional)",
-            value="",
-            help="Leave empty to use the default bucket configured during deployment.",
-        )
+            value=gcs_bucket_name,
+            help="Leave unchanged to use the deployed default bucket.",
+        ).strip()
 
         gcs_prefix = st.text_input(
             "Prefix (optional)",
-            value="",
-            help="Optional folder path inside the bucket. Leave empty to use the default prefix.",
-        )
+            value=gcs_prefix,
+            help="Leave unchanged to use the deployed default prefix.",
+        ).strip()
 
     refresh_clicked = st.button("Load / Refresh Dataset", use_container_width=True)
 
@@ -339,6 +339,10 @@ with st.sidebar:
                 f"(Source: '{result.get('document_source')}', "
                 f"Documents indexed: {result.get('total_documents_loaded', 0)})"
             )
+
+            if document_source == "gcs":
+                gcs_bucket_name = result.get("gcs_bucket_name", gcs_bucket_name)
+                gcs_prefix = result.get("gcs_prefix", gcs_prefix)
 
         except Exception as e:
             st.error(f"Dataset refresh failed: {e}")

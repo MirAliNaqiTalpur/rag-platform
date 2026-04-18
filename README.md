@@ -244,8 +244,6 @@ docker push asia-southeast1-docker.pkg.dev/<PROJECT_ID>/<REPO>/mcp-server:latest
 docker build --no-cache -f docker/Dockerfile.ui -t asia-southeast1-docker.pkg.dev/<PROJECT_ID>/<REPO>/streamlit-ui:latest .
 docker push asia-southeast1-docker.pkg.dev/<PROJECT_ID>/<REPO>/streamlit-ui:latest
 
----
-
 ## Terraform setup
 
 Create:

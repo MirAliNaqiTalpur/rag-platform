@@ -4,89 +4,148 @@
 
 A production-oriented, modular Retrieval-Augmented Generation (RAG) platform with a Model Context Protocol (MCP) server interface, pluggable retrieval and reranking strategies, interchangeable vector backends, and Terraform-based cloud deployment.
 
+---
+
 ## Project overview
 
 This repository implements a cloud-agnostic RAG infrastructure layer designed for reusable deployment across document-centric AI systems. The platform is built around four separable concerns:
 
-- **MCP server** for protocol-based tool exposure to LLM agents
-- **RAG engine** for retrieval, reranking, and answer generation orchestration
-- **Vector storage abstraction** for switching between local and cloud-backed document sources/backends
-- **Evaluation-ready structure** for reproducible experimentation and comparison across configurations
+* **MCP server** for protocol-based tool exposure to LLM agents
+* **RAG engine** for retrieval, reranking, and answer generation orchestration
+* **Vector storage abstraction** for switching between vector backends
+* **Evaluation-ready structure** for reproducible experimentation
 
 The current implementation is validated for:
 
-- local execution
-- Docker Compose deployment
-- GCP Cloud Run deployment using Terraform
-- GCS-backed document loading and runtime dataset switching
+* local execution
+* Docker Compose deployment
+* GCP Cloud Run deployment using Terraform
+* GCS-backed document loading and runtime dataset switching
+* GCS-backed FAISS index persistence
 
-The design goal is to keep core application logic cloud-agnostic while treating infrastructure providers as adapters.
+---
 
 ## Current validated progress vs proposal milestones
 
-**Status:** Month 1 and Month 2 milestone goals have been substantially implemented and validated. Month 3 evaluation and final handoff work is ongoing.
+**Status:** Month 1 and Month 2 milestone goals have been implemented and validated. Month 3 evaluation is pending.
 
-This repository reflects validated progress across local, Docker, and GCP Cloud Run deployments using Terraform, ensuring reproducible and cloud-agnostic behavior.
+### Month 1: Core architecture — completed
 
-### Month 1: Core architecture and infrastructure — completed / validated
+* modular separation of services
+* Docker-based local setup
+* Terraform-based GCP deployment
+* configuration-driven behavior
+* cloud portability (local → Docker → Cloud Run)
 
-- Modular separation between RAG engine, MCP server, UI, and storage layers  
-- Docker-based local orchestration (Docker Compose)  
-- Terraform-based GCP deployment (Cloud Run + GCS)  
-- Configuration-driven runtime behavior using environment variables  
-- Local and GCS-backed document source switching  
-- Reproducible infrastructure setup using Terraform  
+### Month 2: MCP + modular RAG — completed
 
-### Month 2: MCP integration and modular RAG components — completed / validated
+* MCP tool exposure
+* pluggable retrieval + reranking
+* runtime dataset reload
+* GCS-backed document loading
+* vector backend switching (FAISS / Chroma)
 
-- MCP-compatible tool exposure for search and query workflows  
-- Pluggable retrieval and reranking configuration  
-- Metadata-aware retrieval support  
-- Runtime dataset reload via API and UI  
-- Cloud validation of:
-  - default deployed GCS bucket usage  
-  - optional UI override for bucket and prefix  
-- Cross-environment validation (local → Docker → Cloud Run)  
+### Month 3: Evaluation — pending
 
-### Month 3: Evaluation and finalization — in progress
+* Recall@K, Precision@K, MRR
+* strategy comparison
+* experiment tracking
 
-Planned work:
+---
 
-- Evaluation framework for retrieval quality  
-- Metrics: Recall@K, Precision@K, MRR  
-- Strategy comparison across configurations  
-- Experiment tracking and logging  
-- Final deployment and handoff documentation  
-
-### Summary
-
-The system already satisfies the core architectural, modularity, and deployment requirements. Remaining work focuses on evaluation, measurement, and final delivery polish.
-
-## Internship alignment
-
-This project was developed to satisfy the internship objective of designing and implementing a production-ready, modular RAG platform with MCP integration, backend portability, pluggable retrieval strategies, and deployment reproducibility.
-
-## Current architecture
+## Architecture overview
 
 ### Services
 
 1. **rag-engine**
-   - loads dataset from local documents or GCS
-   - builds/rebuilds vector store
-   - serves `/query`, `/search`, `/models`, `/health`, and `/reload-dataset`
+
+   * loads documents from local or GCS
+   * builds vector index
+   * serves `/query`, `/search`, `/models`, `/reload-dataset`
 
 2. **mcp-server**
-   - exposes retrieval tools through MCP-compatible interfaces
-   - delegates retrieval/query execution to rag-engine
+
+   * exposes retrieval tools via MCP
+   * delegates to rag-engine
 
 3. **streamlit-ui**
-   - provides a lightweight operator UI for querying, search-only retrieval, file upload, and dataset switching
-   - supports default deployed GCS bucket usage with optional bucket override
 
-4. **storage / indexing layer**
-   - local documents under `data/documents`
-   - GCS-backed document source for cloud deployment
-   - FAISS-backed index for current retrieval flow
+   * UI for querying, search, dataset reload
+   * supports default GCS bucket with override
+
+4. **storage layer**
+
+   * GCS for documents
+   * FAISS index persisted to GCS
+   * Chroma backend for modular switching
+
+---
+
+## Vector storage and persistence
+
+The platform supports interchangeable vector backends through a unified abstraction layer.
+
+### FAISS (primary backend)
+
+* used for cloud deployment
+* index artifacts stored in GCS
+* enables stateless Cloud Run services
+
+Stored at:
+
+```text
+gs://<bucket>/indexes/faiss/
+```
+
+Artifacts:
+
+* `index.faiss`
+* `docs.json`
+
+### Chroma (secondary backend)
+
+* used to demonstrate backend modularity
+* switchable via configuration
+* not the primary cloud persistence backend
+
+### Persistence flow
+
+1. Documents loaded from:
+
+```text
+gs://<bucket>/documents/
+```
+
+2. FAISS index is built
+3. Index saved locally inside container
+4. Uploaded to:
+
+```text
+gs://<bucket>/indexes/faiss/
+```
+
+5. Index can be restored via API
+
+---
+
+## Restore endpoint
+
+Restore FAISS index from GCS:
+
+```bash
+curl -X POST <RAG_URL>/restore-index
+```
+
+Response:
+
+```json
+{
+  "status": "success",
+  "restored": true
+}
+```
+
+---
 
 ## Repository structure
 
@@ -96,217 +155,159 @@ app/
   ingestion/
   mcp/
   rag/
-  storage/
   vectorstore/
   rag_api.py
   ui.py
 infra/
   terraform/
 docker/
-scripts/
 data/
   documents/
 ```
 
+---
+
 ## Features
 
-- modular RAG engine with configurable retriever and reranker
-- MCP server for tool-oriented access
-- local and GCS-backed dataset loading
-- runtime dataset reload from UI or API
-- Terraform-managed Cloud Run deployment
-- Docker Compose local development workflow
-- configurable Gemini model selection
-- backend-controlled default GCS bucket with optional UI override
+* modular RAG pipeline
+* MCP integration
+* FAISS + Chroma backend switching
+* GCS-backed documents
+* FAISS persistence to GCS
+* runtime dataset reload
+* Terraform deployment
+* Streamlit UI
+
+---
 
 ## Configuration
 
-### Core runtime variables
+### Core variables
 
-- `VECTOR_STORE`
-- `RETRIEVER`
-- `RERANKER`
-- `GENERATOR`
-- `DOCUMENT_SOURCE`
-- `TOP_K`
-- `DEFAULT_MODEL`
-- `AVAILABLE_MODELS`
-- `GEMINI_API_KEY`
+* `VECTOR_STORE`
+* `RETRIEVER`
+* `RERANKER`
+* `GENERATOR`
+* `DOCUMENT_SOURCE`
+* `TOP_K`
 
-### GCS / cloud deployment variables
+### GCS / persistence
 
-- `GCS_BUCKET_NAME`
-- `GCS_PREFIX`
-- `FAISS_INDEX_PREFIX`
-- `RAG_API_URL` for the Streamlit UI
-- `RAG_BASE_URL` for MCP-to-RAG communication where applicable
+* `GCS_BUCKET_NAME`
+* `GCS_PREFIX`
+* `INDEX_STORAGE`
+* `GCS_INDEX_BUCKET`
+* `GCS_INDEX_PREFIX`
+
+---
 
 ## Local development
-
-### 1. Clone the repository
 
 ```bash
 git clone https://github.com/MirAliNaqiTalpur/rag-platform.git
 cd rag-platform
 ```
 
-### 2. Prepare environment
-
-Create a local environment file as needed, for example:
-
 ```bash
 cp .env.example .env.local
 ```
 
-Set required values such as:
+Set:
 
 ```env
-GEMINI_API_KEY=your_key_here
+GEMINI_API_KEY=your_key
 VECTOR_STORE=faiss
-RETRIEVER=hybrid
-RERANKER=simple
-GENERATOR=gemini
 DOCUMENT_SOURCE=local
-TOP_K=3
-DEFAULT_MODEL=gemini-3.1-flash-lite-preview
-AVAILABLE_MODELS=gemini-3.1-flash-lite-preview
 ```
 
-### 3. Run locally with Docker Compose
+Run:
 
 ```bash
 docker compose -f docker/docker-compose.yml up --build
 ```
 
-Typical service endpoints:
+---
 
-- UI: `http://localhost:8501`
-- RAG API: `http://localhost:8001`
-- MCP server: `http://localhost:8000`
+## Cloud deployment (GCP)
 
-## Local validation checklist
-
-Validate the following before cloud deployment:
-
-- UI loads successfully
-- `/health` responds from rag-engine
-- query endpoint returns grounded answers
-- search-only retrieval returns documents
-- switching `DOCUMENT_SOURCE` works
-- local ingest and index rebuild complete without error
-- MCP tool tests pass
-
-## Cloud deployment on GCP
-
-### Deployment model
-
-The current cloud target uses:
-
-- Artifact Registry for images
-- Cloud Run for `rag-engine`, `mcp-server`, and `streamlit-ui`
-- Cloud Storage for documents
-- Terraform for reproducible infrastructure provisioning
-
-### Pre-deployment prerequisites
-
-- authenticated `gcloud` CLI
-- enabled billing on the GCP project
-- Docker installed and authenticated for Artifact Registry
-- Terraform installed
-
-### Build and push images
-
-From the repository root:
+### Build & push images
 
 ```bash
-docker build -f docker/Dockerfile.rag -t asia-southeast1-docker.pkg.dev/<PROJECT_ID>/<REPO>/rag-engine:latest .
-docker push asia-southeast1-docker.pkg.dev/<PROJECT_ID>/<REPO>/rag-engine:latest
-
-docker build -f docker/Dockerfile.mcp -t asia-southeast1-docker.pkg.dev/<PROJECT_ID>/<REPO>/mcp:latest .
-docker push asia-southeast1-docker.pkg.dev/<PROJECT_ID>/<REPO>/mcp:latest
-
-docker build -f docker/Dockerfile.ui -t asia-southeast1-docker.pkg.dev/<PROJECT_ID>/<REPO>/streamlit-ui:latest .
-docker push asia-southeast1-docker.pkg.dev/<PROJECT_ID>/<REPO>/streamlit-ui:latest
+docker build --no-cache -f docker/Dockerfile.rag -t <IMAGE>
+docker push <IMAGE>
 ```
 
-### Terraform configuration
+Repeat for MCP + UI.
 
-Create `infra/terraform/terraform.tfvars` and set:
+---
+
+## Terraform setup
+
+Create:
+
+```bash
+infra/terraform/terraform.tfvars
+```
+
+Example:
 
 ```hcl
 project_id = "your-project-id"
 region     = "asia-southeast1"
 
-artifact_repo_name = "rag-platform-repo"
-
-rag_service_name = "rag-engine"
-mcp_service_name = "mcp-server"
-ui_service_name  = "streamlit-ui"
-
-bucket_name = "your-project-docs-bucket"
-
-documents_prefix   = "documents"
-faiss_index_prefix = "indexes/faiss"
-
-rag_container_image = "asia-southeast1-docker.pkg.dev/your-project-id/rag-platform-repo/rag-engine:latest"
-mcp_container_image = "asia-southeast1-docker.pkg.dev/your-project-id/rag-platform-repo/mcp:latest"
-ui_container_image  = "asia-southeast1-docker.pkg.dev/your-project-id/rag-platform-repo/streamlit-ui:latest"
+bucket_name         = "your-bucket"
+documents_prefix    = "documents"
+faiss_index_prefix  = "indexes/faiss"
 
 vector_store    = "faiss"
-retriever       = "hybrid"
-reranker        = "simple"
-generator       = "gemini"
 document_source = "gcs"
 
-top_k = 3
-
-gemini_api_key = ""
-
-allow_unauthenticated = true
-deploy_ui             = true
+gemini_secret_name = "gemini-api-key"
 ```
 
-### Apply infrastructure
+---
+
+## Deploy
 
 ```bash
 cd infra/terraform
 terraform init
-terraform fmt
+terraform validate
 terraform plan
 terraform apply
 ```
 
-## Post-deployment validation checklist
+---
 
-After deployment, verify:
+## Validation checklist
 
-- `rag-engine` Cloud Run service is healthy
-- `streamlit-ui` opens successfully
-- empty GCS bucket field in UI uses the default deployed bucket
-- manually entered GCS bucket overrides the default bucket
-- local source switching still works
-- query and search-only endpoints return expected results
-- MCP server can still reach the RAG service
+* rag-engine `/health` works
+* UI loads
+* reload dataset works
+* GCS contains:
 
-## Destroying cloud infrastructure
+  * `documents/`
+  * `indexes/faiss/`
+* `/restore-index` works
+* FAISS query works
+* Chroma switch works
 
-To simulate a clean delivery and redeployment cycle:
+---
 
-```bash
-cd infra/terraform
-terraform destroy
-```
+## Limitations
 
-Recommended before destroy:
+* UI is minimal
+* Chroma not used as persistent cloud backend
+* evaluation framework not yet implemented
 
-- export or note current Cloud Run service URLs
-- confirm whether GCS bucket contents should be preserved or removed
-- ensure any manually uploaded test documents are backed up if needed
+---
 
-## Known current scope and limitations
+## Final note
 
-- the UI is lightweight and operational, not a production front-end
-- enterprise auth and advanced security hardening are not yet finalized
-- current validation focuses on GCP deployment, while cloud portability is demonstrated architecturally and through Terraform-driven patterns rather than live multi-cloud rollout
-- evaluation framework is not yet fully completed to final month-3 depth
+This system demonstrates a modular, cloud-agnostic RAG architecture where:
 
+* core logic is independent of cloud provider
+* infrastructure is provisioned via Terraform
+* vector index persistence is externalized from container lifecycle
+
+This satisfies the internship objective of building a reusable RAG infrastructure layer.

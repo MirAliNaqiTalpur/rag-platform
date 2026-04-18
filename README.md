@@ -230,14 +230,19 @@ docker compose -f docker/docker-compose.yml up --build
 
 ## Cloud deployment (GCP)
 
-### Build & push images
+### Build and push images
+
+From the repository root:
 
 ```bash
-docker build --no-cache -f docker/Dockerfile.rag -t <IMAGE>
-docker push <IMAGE>
-```
+docker build --no-cache -f docker/Dockerfile.rag -t asia-southeast1-docker.pkg.dev/<PROJECT_ID>/<REPO>/rag-engine:latest .
+docker push asia-southeast1-docker.pkg.dev/<PROJECT_ID>/<REPO>/rag-engine:latest
 
-Repeat for MCP + UI.
+docker build --no-cache -f docker/Dockerfile.mcp -t asia-southeast1-docker.pkg.dev/<PROJECT_ID>/<REPO>/mcp-server:latest .
+docker push asia-southeast1-docker.pkg.dev/<PROJECT_ID>/<REPO>/mcp-server:latest
+
+docker build --no-cache -f docker/Dockerfile.ui -t asia-southeast1-docker.pkg.dev/<PROJECT_ID>/<REPO>/streamlit-ui:latest .
+docker push asia-southeast1-docker.pkg.dev/<PROJECT_ID>/<REPO>/streamlit-ui:latest
 
 ---
 

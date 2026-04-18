@@ -352,7 +352,10 @@ def reload_dataset(payload: dict) -> dict[str, Any]:
         total_docs = _rebuild_vector_store()
 
         get_rag.cache_clear()
-        get_rag()
+
+        # Only warm up if documents exist
+        if total_docs > 0:
+            get_rag()
 
         message = (
             f"{bucket_message} Dataset loaded successfully."

@@ -18,11 +18,38 @@ class FAISSStore:
 
     def add_documents(self, docs):
         texts = [self._doc_text(doc) for doc in docs]
+
+        # Handle empty input early
+        if not texts:
+            self.documents = []
+            self.index = None
+            return
+
         embeddings = self.embedding_model.encode(texts)
+
+        # Convert to numpy array safely
+        embeddings = np.array(embeddings)
+
+        # Handle edge cases
+        if embeddings.size == 0:
+            self.documents = []
+            self.index = None
+            return
+
+        # Ensure 2D shape (n_docs, dim)
+        if len(embeddings.shape) == 1:
+            embeddings = embeddings.reshape(1, -1)
+
+        # Final safety check
+        if len(embeddings.shape) < 2 or embeddings.shape[1] == 0:
+            self.documents = []
+            self.index = None
+            return
+
         dim = embeddings.shape[1]
 
         self.index = faiss.IndexFlatL2(dim)
-        self.index.add(np.array(embeddings, dtype="float32"))
+        self.index.add(embeddings.astype("float32"))
 
         self.documents = docs
 

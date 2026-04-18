@@ -14,4 +14,9 @@ CONFIG = {
     "reranker": os.getenv("RERANKER", "simple"),
     "top_k": get_int_env("TOP_K", 3),
     "generator": os.getenv("GENERATOR", "gemini"),
+
+    # Index persistence settings
+    "index_storage": os.getenv("INDEX_STORAGE", "local").lower(),
+    "gcs_index_bucket": os.getenv("GCS_INDEX_BUCKET", os.getenv("GCS_BUCKET_NAME", "")).strip(),
+    "gcs_index_prefix": os.getenv("GCS_INDEX_PREFIX", "indexes/faiss").strip(),
 }

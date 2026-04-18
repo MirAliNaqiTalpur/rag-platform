@@ -5,6 +5,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from google.cloud import storage
 
 from app.core.config import CONFIG
 from app.ingestion.loader import load_documents
@@ -118,6 +119,18 @@ def _update_runtime_config(payload: dict) -> dict[str, str | int]:
     CONFIG["reranker"] = reranker
     CONFIG["generator"] = generator
     CONFIG["top_k"] = top_k
+    CONFIG["index_storage"] = os.getenv(
+        "INDEX_STORAGE",
+        CONFIG.get("index_storage", "local"),
+    ).lower()
+    CONFIG["gcs_index_bucket"] = os.getenv(
+        "GCS_INDEX_BUCKET",
+        CONFIG.get("gcs_index_bucket", os.getenv("GCS_BUCKET_NAME", "")),
+    ).strip()
+    CONFIG["gcs_index_prefix"] = os.getenv(
+        "GCS_INDEX_PREFIX",
+        CONFIG.get("gcs_index_prefix", "indexes/faiss"),
+    ).strip()
 
     return {
         "document_source": document_source,
@@ -143,11 +156,84 @@ def _clear_vector_store_artifacts() -> None:
         if os.path.exists(FAISS_INDEX_DIR):
             shutil.rmtree(FAISS_INDEX_DIR)
 
-
-
     elif vector_store == "memory":
-        # Nothing persisted on disk for memory store.
         pass
+
+
+def _get_faiss_gcs_location() -> tuple[str, str]:
+    bucket = CONFIG.get("gcs_index_bucket") or os.getenv(
+        "GCS_INDEX_BUCKET",
+        os.getenv("GCS_BUCKET_NAME", ""),
+    ).strip()
+    prefix = CONFIG.get("gcs_index_prefix") or os.getenv(
+        "GCS_INDEX_PREFIX",
+        "indexes/faiss",
+    ).strip()
+    return bucket, prefix
+
+
+def _upload_directory_to_gcs(local_dir: str, bucket_name: str, prefix: str) -> None:
+    if not bucket_name or not os.path.exists(local_dir):
+        return
+
+    client = storage.Client()
+    bucket = client.bucket(bucket_name)
+
+    for root, _, files in os.walk(local_dir):
+        for filename in files:
+            local_path = os.path.join(root, filename)
+            rel_path = os.path.relpath(local_path, local_dir).replace("\\", "/")
+            blob_name = f"{prefix.rstrip('/')}/{rel_path}" if prefix else rel_path
+            blob = bucket.blob(blob_name)
+            blob.upload_from_filename(local_path)
+
+
+def _download_directory_from_gcs(local_dir: str, bucket_name: str, prefix: str) -> bool:
+    if not bucket_name:
+        return False
+
+    client = storage.Client()
+    bucket = client.bucket(bucket_name)
+    normalized_prefix = prefix.rstrip("/")
+
+    blobs = list(bucket.list_blobs(prefix=f"{normalized_prefix}/" if normalized_prefix else None))
+
+    if not blobs:
+        return False
+
+    os.makedirs(local_dir, exist_ok=True)
+
+    downloaded = False
+    for blob in blobs:
+        if blob.name.endswith("/"):
+            continue
+
+        if normalized_prefix:
+            rel_path = blob.name[len(normalized_prefix) + 1 :]
+        else:
+            rel_path = blob.name
+
+        local_path = os.path.join(local_dir, rel_path)
+        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+        blob.download_to_filename(local_path)
+        downloaded = True
+
+    return downloaded
+
+
+def _restore_faiss_index_from_gcs() -> bool:
+    index_storage = CONFIG.get("index_storage", os.getenv("INDEX_STORAGE", "local")).lower()
+    vector_store = CONFIG.get("vector_store", os.getenv("VECTOR_STORE", "faiss")).lower()
+
+    if vector_store != "faiss" or index_storage != "gcs":
+        return False
+
+    bucket_name, prefix = _get_faiss_gcs_location()
+
+    if os.path.exists(FAISS_INDEX_DIR):
+        shutil.rmtree(FAISS_INDEX_DIR)
+
+    return _download_directory_from_gcs(FAISS_INDEX_DIR, bucket_name, prefix)
 
 
 def _rebuild_vector_store() -> int:
@@ -164,8 +250,14 @@ def _rebuild_vector_store() -> int:
     try:
         store.save()
     except Exception:
-        # Some stores may persist automatically or not require explicit save.
         pass
+
+    vector_store = CONFIG.get("vector_store", os.getenv("VECTOR_STORE", "faiss")).lower()
+    index_storage = CONFIG.get("index_storage", os.getenv("INDEX_STORAGE", "local")).lower()
+
+    if vector_store == "faiss" and index_storage == "gcs":
+        bucket_name, prefix = _get_faiss_gcs_location()
+        _upload_directory_to_gcs(FAISS_INDEX_DIR, bucket_name, prefix)
 
     return len(docs)
 
@@ -198,6 +290,21 @@ def warmup() -> dict[str, str]:
         return {"status": "ok", "message": "RAG engine initialized successfully."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Warmup failed: {e}") from e
+
+
+@app.post("/restore-index")
+def restore_index() -> dict[str, Any]:
+    try:
+        restored = _restore_faiss_index_from_gcs()
+        return {
+            "status": "success",
+            "vector_store": os.getenv("VECTOR_STORE", "faiss"),
+            "index_storage": os.getenv("INDEX_STORAGE", "local"),
+            "restored": restored,
+            "message": "FAISS index restored from GCS." if restored else "No FAISS index found in GCS.",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Index restore failed: {e}") from e
 
 
 @app.post("/reload-dataset")
@@ -244,7 +351,6 @@ def reload_dataset(payload: dict) -> dict[str, Any]:
 
         total_docs = _rebuild_vector_store()
 
-        # Recreate engine after backend/source/runtime config changes.
         get_rag.cache_clear()
         get_rag()
 

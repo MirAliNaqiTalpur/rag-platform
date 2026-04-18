@@ -46,7 +46,13 @@ class FAISSStore:
             json.dump(self.documents, f, ensure_ascii=False, indent=2)
 
     def load(self, path="data/faiss_index"):
-        self.index = faiss.read_index(os.path.join(path, "index.faiss"))
+        index_path = os.path.join(path, "index.faiss")
+        docs_path = os.path.join(path, "docs.json")
 
-        with open(os.path.join(path, "docs.json"), "r", encoding="utf-8") as f:
+        if not os.path.exists(index_path) or not os.path.exists(docs_path):
+            raise FileNotFoundError(f"FAISS index files not found in: {path}")
+
+        self.index = faiss.read_index(index_path)
+
+        with open(docs_path, "r", encoding="utf-8") as f:
             self.documents = json.load(f)

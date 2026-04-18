@@ -79,6 +79,13 @@ resource "google_storage_bucket_iam_member" "runtime_bucket_access" {
   member = "serviceAccount:${google_service_account.runtime.email}"
 }
 
+resource "google_secret_manager_secret_iam_member" "runtime_secret_access" {
+  project   = var.project_id
+  secret_id = var.gemini_secret_name
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.runtime.email}"
+}
+
 resource "google_cloud_run_v2_service" "rag_engine" {
   name                = var.rag_service_name
   location            = var.region
@@ -153,8 +160,28 @@ resource "google_cloud_run_v2_service" "rag_engine" {
       }
 
       env {
-        name  = "GEMINI_API_KEY"
-        value = var.gemini_api_key
+        name  = "INDEX_STORAGE"
+        value = "gcs"
+      }
+
+      env {
+        name  = "GCS_INDEX_BUCKET"
+        value = google_storage_bucket.documents.name
+      }
+
+      env {
+        name  = "GCS_INDEX_PREFIX"
+        value = var.faiss_index_prefix
+      }
+
+      env {
+        name = "GEMINI_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = var.gemini_secret_name
+            version = "latest"
+          }
+        }
       }
 
       env {
@@ -174,7 +201,8 @@ resource "google_cloud_run_v2_service" "rag_engine" {
   depends_on = [
     google_project_service.services,
     google_storage_bucket.documents,
-    google_service_account.runtime
+    google_service_account.runtime,
+    google_secret_manager_secret_iam_member.runtime_secret_access
   ]
 }
 
@@ -309,8 +337,13 @@ resource "google_cloud_run_v2_service" "streamlit_ui" {
       }
 
       env {
-        name  = "GEMINI_API_KEY"
-        value = var.gemini_api_key
+        name = "GEMINI_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = var.gemini_secret_name
+            version = "latest"
+          }
+        }
       }
 
       env {
@@ -334,7 +367,8 @@ resource "google_cloud_run_v2_service" "streamlit_ui" {
 
   depends_on = [
     google_project_service.services,
-    google_cloud_run_v2_service.rag_engine
+    google_cloud_run_v2_service.rag_engine,
+    google_secret_manager_secret_iam_member.runtime_secret_access
   ]
 }
 

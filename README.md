@@ -263,6 +263,7 @@ ui_container_image  = "asia-southeast1-docker.pkg.dev/your-project-id/rag-platfo
 gemini_secret_name = "gemini-api-key"
 ```
 
+> Note: `bucket_name` must be globally unique across Google Cloud Storage.
 ---
 
 ### First Terraform apply

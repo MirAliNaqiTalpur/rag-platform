@@ -39,4 +39,5 @@ docker/*.log
 # =========================
 *.tmp
 *.bak
-*.swp
+*.swp.terraform/
+*.tfstate*

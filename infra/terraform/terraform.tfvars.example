@@ -26,3 +26,5 @@ allow_unauthenticated = true
 deploy_ui           = true
 
 gemini_secret_name  = "gemini-api-key"
+
+deploy_services = false

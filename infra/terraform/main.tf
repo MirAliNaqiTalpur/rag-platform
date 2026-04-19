@@ -87,6 +87,7 @@ resource "google_secret_manager_secret_iam_member" "runtime_secret_access" {
 }
 
 resource "google_cloud_run_v2_service" "rag_engine" {
+  count               = var.deploy_services ? 1 : 0
   name                = var.rag_service_name
   location            = var.region
   project             = var.project_id
@@ -207,15 +208,16 @@ resource "google_cloud_run_v2_service" "rag_engine" {
 }
 
 resource "google_cloud_run_v2_service_iam_member" "rag_public" {
-  count    = var.allow_unauthenticated ? 1 : 0
+  count    = var.deploy_services && var.allow_unauthenticated ? 1 : 0
   project  = var.project_id
   location = var.region
-  name     = google_cloud_run_v2_service.rag_engine.name
+  name     = google_cloud_run_v2_service.rag_engine[0].name
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
 
 resource "google_cloud_run_v2_service" "mcp_server" {
+  count               = var.deploy_services ? 1 : 0
   name                = var.mcp_service_name
   location            = var.region
   project             = var.project_id
@@ -235,7 +237,7 @@ resource "google_cloud_run_v2_service" "mcp_server" {
 
       env {
         name  = "RAG_BASE_URL"
-        value = google_cloud_run_v2_service.rag_engine.uri
+        value = google_cloud_run_v2_service.rag_engine[0].uri
       }
 
       resources {
@@ -254,16 +256,16 @@ resource "google_cloud_run_v2_service" "mcp_server" {
 }
 
 resource "google_cloud_run_v2_service_iam_member" "mcp_public" {
-  count    = var.allow_unauthenticated ? 1 : 0
+  count    = var.deploy_services && var.allow_unauthenticated ? 1 : 0
   project  = var.project_id
   location = var.region
-  name     = google_cloud_run_v2_service.mcp_server.name
+  name     = google_cloud_run_v2_service.mcp_server[0].name
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
 
 resource "google_cloud_run_v2_service" "streamlit_ui" {
-  count               = var.deploy_ui ? 1 : 0
+  count               = var.deploy_services && var.deploy_ui ? 1 : 0
   name                = var.ui_service_name
   location            = var.region
   project             = var.project_id
@@ -348,7 +350,7 @@ resource "google_cloud_run_v2_service" "streamlit_ui" {
 
       env {
         name  = "RAG_API_URL"
-        value = google_cloud_run_v2_service.rag_engine.uri
+        value = google_cloud_run_v2_service.rag_engine[0].uri
       }
 
       env {
@@ -373,7 +375,7 @@ resource "google_cloud_run_v2_service" "streamlit_ui" {
 }
 
 resource "google_cloud_run_v2_service_iam_member" "ui_public" {
-  count    = var.deploy_ui && var.allow_unauthenticated ? 1 : 0
+  count    = var.deploy_services && var.deploy_ui && var.allow_unauthenticated ? 1 : 0
   project  = var.project_id
   location = var.region
   name     = google_cloud_run_v2_service.streamlit_ui[0].name

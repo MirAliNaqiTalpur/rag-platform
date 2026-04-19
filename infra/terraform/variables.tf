@@ -124,3 +124,9 @@ variable "allow_custom_models" {
   type        = bool
   default     = true
 }
+
+variable "deploy_services" {
+  description = "Whether to deploy Cloud Run services"
+  type        = bool
+  default     = false
+}

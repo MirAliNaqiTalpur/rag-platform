@@ -228,7 +228,7 @@ gcloud services enable \
 
 ---
 
-## Terraform-first deployment (FINAL FLOW)
+## Terraform-first deployment
 
 ### Create Gemini secret
 

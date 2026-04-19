@@ -8,48 +8,22 @@ A production-oriented, modular Retrieval-Augmented Generation (RAG) platform wit
 
 ## Project overview
 
-This repository implements a cloud-agnostic RAG infrastructure layer designed for reusable deployment across document-centric AI systems. The platform is built around four separable concerns:
+This repository implements a cloud-agnostic RAG infrastructure layer designed for reusable deployment across document-centric AI systems.
 
-* **MCP server** for protocol-based tool exposure to LLM agents
-* **RAG engine** for retrieval, reranking, and answer generation orchestration
-* **Vector storage abstraction** for switching between vector backends
-* **Evaluation-ready structure** for reproducible experimentation
+The platform is built around four separable concerns:
 
-The current implementation is validated for:
+* **MCP server** for protocol-based tool exposure
+* **RAG engine** for retrieval, reranking, and generation
+* **Vector storage abstraction** for backend switching
+* **Evaluation-ready structure** for experimentation
+
+Validated for:
 
 * local execution
 * Docker Compose deployment
-* GCP Cloud Run deployment using Terraform
-* GCS-backed document loading and runtime dataset switching
-* GCS-backed FAISS index persistence
-
----
-
-## Current validated progress vs proposal milestones
-
-**Status:** Month 1 and Month 2 milestone goals have been implemented and validated. Month 3 evaluation is pending.
-
-### Month 1: Core architecture — completed
-
-* modular separation of services
-* Docker-based local setup
-* Terraform-based GCP deployment
-* configuration-driven behavior
-* cloud portability (local → Docker → Cloud Run)
-
-### Month 2: MCP + modular RAG — completed
-
-* MCP tool exposure
-* pluggable retrieval + reranking
-* runtime dataset reload
+* Terraform-based Cloud Run deployment
 * GCS-backed document loading
-* vector backend switching (FAISS / Chroma)
-
-### Month 3: Evaluation — pending
-
-* Recall@K, Precision@K, MRR
-* strategy comparison
-* experiment tracking
+* FAISS persistence on GCS
 
 ---
 
@@ -61,34 +35,30 @@ The current implementation is validated for:
 
    * loads documents from local or GCS
    * builds vector index
-   * serves `/query`, `/search`, `/models`, `/reload-dataset`, and `/restore-index`
+   * serves `/query`, `/search`, `/models`, `/reload-dataset`, `/restore-index`
 
 2. **mcp-server**
 
-   * exposes retrieval tools via MCP
-   * delegates to rag-engine
+   * exposes tools via MCP
+   * calls rag-engine internally
 
 3. **streamlit-ui**
 
-   * UI for querying, search, dataset reload
+   * frontend interface
 
-4. **storage layer**
+4. **storage**
 
-   * GCS for documents
-   * FAISS index persisted to GCS
-   * Chroma backend for modular switching
+   * GCS for documents + index
+   * FAISS (primary)
+   * Chroma (secondary)
 
 ---
 
-## Vector storage and persistence
+## Vector storage
 
-### FAISS (primary backend)
+### FAISS (primary)
 
-* used for cloud deployment
-* index artifacts stored in GCS
-* enables stateless Cloud Run services
-
-Stored at:
+Stored in:
 
 ```
 gs://<bucket>/indexes/faiss/
@@ -99,79 +69,9 @@ Artifacts:
 * `index.faiss`
 * `docs.json`
 
-### Chroma (secondary backend)
+### Chroma (secondary)
 
-* used to demonstrate backend modularity
-* switchable via configuration
-
-### Persistence flow
-
-1. Documents loaded from:
-
-```
-gs://<bucket>/documents/
-```
-
-2. FAISS index is built
-3. Index is saved locally
-4. Index uploaded to:
-
-```
-gs://<bucket>/indexes/faiss/
-```
-
-5. Can be restored via API
-
----
-
-## Restore endpoint
-
-```bash
-curl -X POST <RAG_URL>/restore-index
-```
-
----
-
-## Repository structure
-
-```
-app/
-infra/
-docker/
-data/
-```
-
----
-
-## Features
-
-* modular RAG pipeline
-* MCP integration
-* FAISS + Chroma switching
-* GCS-backed documents
-* FAISS persistence
-* runtime dataset reload
-* Terraform deployment
-* Streamlit UI
-
----
-
-## Configuration
-
-### Core variables
-
-* VECTOR_STORE
-* RETRIEVER
-* RERANKER
-* GENERATOR
-* DOCUMENT_SOURCE
-* TOP_K
-
-### GCS variables
-
-* GCS_BUCKET_NAME
-* GCS_PREFIX
-* GCS_INDEX_PREFIX
+* used for modular backend demonstration
 
 ---
 
@@ -228,21 +128,39 @@ gcloud services enable \
 
 ---
 
-## Terraform-first deployment
+# Terraform-first deployment (FINAL FLOW)
 
-### Create Gemini secret
+## Overview
+
+Deployment is done in **two phases**:
+
+1. **Phase 1 — Infrastructure only**
+2. **Phase 2 — Services deployment**
+
+---
+
+## Create Gemini secret
 
 ```bash
 echo -n "YOUR_GEMINI_API_KEY" | gcloud secrets create gemini-api-key --data-file=-
 ```
 
----
-
-### Create terraform.tfvars
+If exists:
 
 ```bash
-infra/terraform/terraform.tfvars
+echo -n "YOUR_GEMINI_API_KEY" | gcloud secrets versions add gemini-api-key --data-file=-
 ```
+
+---
+
+## Create terraform.tfvars
+
+```bash
+cd infra/terraform
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Edit:
 
 ```hcl
 project_id = "your-project-id"
@@ -254,36 +172,53 @@ rag_service_name = "rag-engine"
 mcp_service_name = "mcp-server"
 ui_service_name  = "streamlit-ui"
 
-bucket_name = "your-bucket"
+bucket_name         = "your-unique-bucket"
+documents_prefix    = "documents"
+faiss_index_prefix  = "indexes/faiss"
 
 rag_container_image = "asia-southeast1-docker.pkg.dev/your-project-id/rag-platform-repo/rag-engine:latest"
 mcp_container_image = "asia-southeast1-docker.pkg.dev/your-project-id/rag-platform-repo/mcp-server:latest"
 ui_container_image  = "asia-southeast1-docker.pkg.dev/your-project-id/rag-platform-repo/streamlit-ui:latest"
 
-gemini_secret_name = "gemini-api-key"
+vector_store    = "faiss"
+retriever       = "hybrid"
+reranker        = "simple"
+generator       = "gemini"
+document_source = "gcs"
+
+top_k = 3
+
+gemini_secret_name    = "gemini-api-key"
+allow_unauthenticated = true
+deploy_ui             = true
+allow_custom_models   = true
+
+deploy_services = false
 ```
 
-> Note: `bucket_name` must be globally unique across Google Cloud Storage.
 ---
 
-### First Terraform apply
+## Phase 1 — Terraform apply (infra only)
 
 ```bash
-cd infra/terraform
 terraform init
+terraform validate
+terraform plan
 terraform apply
 ```
 
 Creates:
 
 * Artifact Registry
-* GCS
-* IAM
-* Cloud Run
+* GCS bucket
+* IAM + service account
+* Secret access
+
+No Cloud Run services yet.
 
 ---
 
-### Configure Docker
+## Configure Docker
 
 ```bash
 gcloud auth configure-docker asia-southeast1-docker.pkg.dev
@@ -291,32 +226,67 @@ gcloud auth configure-docker asia-southeast1-docker.pkg.dev
 
 ---
 
-### Build & push images
+## Build and push images
 
 ```bash
-docker build -f docker/Dockerfile.rag -t asia-southeast1-docker.pkg.dev/<PROJECT_ID>/rag-platform-repo/rag-engine:latest .
-docker push asia-southeast1-docker.pkg.dev/<PROJECT_ID>/rag-platform-repo/rag-engine:latest
-```
+docker build --no-cache -f docker/Dockerfile.rag -t asia-southeast1-docker.pkg.dev/<PROJECT_ID>/rag-platform-repo/rag-engine:latest .
+docker build --no-cache -f docker/Dockerfile.mcp -t asia-southeast1-docker.pkg.dev/<PROJECT_ID>/rag-platform-repo/mcp-server:latest .
+docker build --no-cache -f docker/Dockerfile.ui -t asia-southeast1-docker.pkg.dev/<PROJECT_ID>/rag-platform-repo/streamlit-ui:latest .
 
-(repeat for mcp + ui)
+docker push asia-southeast1-docker.pkg.dev/<PROJECT_ID>/rag-platform-repo/rag-engine:latest
+docker push asia-southeast1-docker.pkg.dev/<PROJECT_ID>/rag-platform-repo/mcp-server:latest
+docker push asia-southeast1-docker.pkg.dev/<PROJECT_ID>/rag-platform-repo/streamlit-ui:latest
+```
 
 ---
 
-### Second Terraform apply
+## Phase 2 — Deploy services
+
+Update:
+
+```hcl
+deploy_services = true
+```
+
+Then:
 
 ```bash
+terraform plan
 terraform apply
+```
+
+Outputs:
+
+* `rag_service_url`
+* `mcp_service_url`
+* `streamlit_ui_url`
+
+---
+
+## Upload documents to GCS
+
+```bash
+gcloud storage cp -r data/documents/* gs://<BUCKET_NAME>/documents/
+```
+
+Verify:
+
+```bash
+gcloud storage ls gs://<BUCKET_NAME>/documents/
 ```
 
 ---
 
 ## Validation checklist
 
-* rag-engine `/health` works
+* Terraform outputs service URLs
+* `/health` endpoint works
 * UI loads
+* documents uploaded to GCS
 * dataset reload works
-* GCS has documents + indexes
-* restore-index works
+* index stored in `indexes/faiss/`
+* `/restore-index` works
+* queries return results
 
 ---
 
@@ -332,9 +302,9 @@ terraform destroy
 
 This project demonstrates:
 
-* modular RAG design
-* MCP-based tool exposure
+* modular RAG architecture
+* MCP integration
 * Terraform-based deployment
-* cloud-agnostic architecture
+* cloud-agnostic design
 
-Designed as a **production-style internship deliverable**.
+Designed as a **production-grade internship deliverable**.

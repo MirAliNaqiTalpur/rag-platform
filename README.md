@@ -44,7 +44,17 @@ Validated for:
 
 3. **streamlit-ui**
 
-   * frontend interface
+   * Frontend interface for interacting with the RAG system
+
+---
+
+## Demo
+
+The Streamlit interface provides an interactive front-end for submitting queries, viewing generated answers, and inspecting retrieved documents.
+
+<p align="center">
+  <img src="images/streamlit-ui-demo.png" alt="Streamlit UI Demo" width="900"/>
+</p>
 
 4. **storage**
 

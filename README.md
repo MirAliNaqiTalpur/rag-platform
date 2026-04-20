@@ -114,27 +114,101 @@ The platform is implemented as a multi-service, modular Retrieval-Augmented Gene
 
 ### Retrieval and Ranking
 
-**Retrieval (current implementation)**
+The platform implements a **modular retrieval and ranking pipeline** with configurable strategies, allowing flexibility in how documents are selected and ordered before generation.
 
-* Primary vector backend: **FAISS**
-* Secondary backend: **Chroma**
-* Embedding model: `sentence-transformers/all-MiniLM-L6-v2`
-* Query-time control: `top_k` for Top-K retrieval
+---
 
-Behavior:
+### Retrieval Layer
 
-* Documents are chunked and embedded during indexing
-* The system retrieves the Top-K most relevant chunks
-* `top_k` can be controlled through the API and Streamlit UI
-* The retriever/backend behavior is driven by configuration rather than hardcoded changes
+Retrieval is responsible for selecting the most relevant document chunks based on the input query.
 
-**Reranking**
+**Core Behavior:**
+- Documents are chunked and embedded during ingestion
+- Query is embedded at runtime
+- Similarity search is performed against the vector store
+- Top-K results are returned
 
-* Reranking is supported as an optional stage in the pipeline
-* The current configuration supports explicit reranker selection
-* The design is intended for extension to additional rerankers such as cross-encoder or LLM-based reranking
+**Key Parameter:**
+- `top_k` → controls the number of retrieved documents  
+  - Default: `3`  
+  - Exposed via API (`/query`, `/search`) and Streamlit UI  
+  - Increasing `top_k` improves recall but may introduce noise
 
-This keeps retrieval and ranking modular, so relevance improvements can be introduced without redesigning the rest of the system.
+---
+
+### Available Retrieval Strategies
+
+The system uses a **strategy-based design**, allowing retrieval methods to be swapped via configuration.
+
+#### 1. Simple Retriever
+- Dense vector similarity search using FAISS
+- Fast and efficient
+- Suitable for well-structured semantic datasets
+
+#### 2. Hybrid Retriever
+- Combines multiple retrieval signals (e.g., semantic similarity + keyword relevance)
+- Improves robustness for mixed or noisy data
+- Recommended for general-purpose usage
+
+#### 3. Metadata Retriever
+- Filters documents based on metadata fields
+- Enables structured retrieval (e.g., by source, type, or tags)
+- Used when metadata-aware queries are required
+
+---
+
+### Vector Backends
+
+Retrievers operate on interchangeable vector storage backends:
+
+- **FAISS (Primary)**
+  - High-performance local vector search
+  - Used in both local and cloud deployments (with GCS persistence)
+
+- **Chroma (Secondary)**
+  - Included to demonstrate backend modularity
+  - Enables switching vector stores without modifying pipeline logic
+
+---
+
+### Reranking Layer
+
+Reranking is an optional stage that refines the ordering of retrieved documents before passing them to the LLM.
+
+**Purpose:**
+- Improve relevance of top results
+- Reduce noise introduced by retrieval
+
+**Current Implementation:**
+- **Simple Reranker**
+  - Lightweight scoring-based reordering
+  - Fast and suitable for baseline improvements
+
+**Design Note:**
+The system is designed to support future extensions such as:
+- Cross-encoder rerankers
+- LLM-based reranking
+
+---
+
+### End-to-End Retrieval Flow
+
+1. Query is received
+2. Query embedding is generated
+3. Retriever fetches Top-K document chunks
+4. (Optional) Reranker reorders results
+5. Final context is passed to the generator (LLM)
+
+---
+
+### Why This Design Matters
+
+This modular approach ensures:
+
+- Retrieval strategies can be changed without modifying core logic
+- Ranking improvements can be introduced independently
+- Vector backends can be swapped (FAISS ↔ Chroma ↔ managed DB)
+- System remains extensible for research and production use
 
 ### Vector storage
 

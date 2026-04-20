@@ -27,24 +27,151 @@ Validated for:
 
 ---
 
-## Architecture overview
+## Architecture Overview
+
+The platform is implemented as a multi-service, modular Retrieval-Augmented Generation (RAG) system. Each component is independently deployable and configurable, enabling clear separation of concerns between retrieval, ranking, tool interaction, and generation. This design allows the system to be reproducible across local and cloud environments while remaining extensible.
 
 ### Services
 
-1. **rag-engine**
+1. **rag-engine (FastAPI backend)**  
+   The `rag-engine` is the core service responsible for executing the RAG pipeline. It exposes REST APIs and handles retrieval, optional reranking, and response generation.
 
-   * loads documents from local or GCS
-   * builds vector index
-   * serves `/query`, `/search`, `/models`, `/reload-dataset`, `/restore-index`
+   Available endpoints:
 
-2. **mcp-server**
+   * `/query` → full RAG pipeline (retrieval + generation)
+   * `/search` → retrieval only
+   * `/models` → list available LLM models
+   * `/reload-dataset` → rebuild vector index from documents
+   * `/restore-index` → restore FAISS index from storage
+   * `/health` → service health check
 
-   * exposes tools via MCP
-   * calls rag-engine internally
+   RAG pipeline flow:
 
-3. **streamlit-ui**
+   1. Accept user query
+   2. Retrieve Top-K relevant document chunks
+   3. (Optional) rerank results
+   4. Construct context
+   5. Generate response using an LLM
 
-   * Frontend interface for interacting with the RAG system
+   Key parameter:
+
+   * `top_k` → controls the number of retrieved documents (default: 3)
+
+   Example request:
+
+   ```json
+   {
+     "query": "What is MCP?",
+     "top_k": 3,
+     "model": "gemini-3-flash-preview"
+   }
+   ```
+
+2. **mcp-server**  
+   The `mcp-server` exposes tools using the Model Context Protocol (MCP) and interacts with the `rag-engine` internally.
+
+   Tools are defined in:
+
+   ```text
+   app/mcp/tools.py
+   ```
+
+   Currently available tools:
+
+   * `search_documents` → retrieve relevant document chunks
+   * `answer_query` → execute the full RAG pipeline
+   * `search_by_metadata` → perform metadata-based filtering
+
+   Tool behavior:
+
+   * Tools must be explicitly registered in the MCP layer
+   * They are not automatically discovered from code
+   * Once registered, they become available to the system
+
+   Extending tools:
+
+   * Add a new function in `tools.py`
+   * Register it in the tool registry
+   * Rebuild and redeploy the service
+
+3. **streamlit-ui**  
+   The Streamlit UI provides an interactive frontend for demonstrating and validating the system.
+
+   Features:
+
+   * Query input interface
+   * Model selection
+   * `top_k` control
+   * Display of retrieved documents
+   * Generated responses
+   * Latency metrics
+
+4. **storage**
+
+   * GCS for documents and persisted index artifacts
+   * FAISS (primary vector backend)
+   * Chroma (secondary backend for modular backend demonstration)
+
+### Retrieval and Ranking
+
+**Retrieval (current implementation)**
+
+* Primary vector backend: **FAISS**
+* Secondary backend: **Chroma**
+* Embedding model: `sentence-transformers/all-MiniLM-L6-v2`
+* Query-time control: `top_k` for Top-K retrieval
+
+Behavior:
+
+* Documents are chunked and embedded during indexing
+* The system retrieves the Top-K most relevant chunks
+* `top_k` can be controlled through the API and Streamlit UI
+* The retriever/backend behavior is driven by configuration rather than hardcoded changes
+
+**Reranking**
+
+* Reranking is supported as an optional stage in the pipeline
+* The current configuration supports explicit reranker selection
+* The design is intended for extension to additional rerankers such as cross-encoder or LLM-based reranking
+
+This keeps retrieval and ranking modular, so relevance improvements can be introduced without redesigning the rest of the system.
+
+### Vector storage
+
+The system uses a vector store abstraction layer to avoid coupling the RAG pipeline to a single backend.
+
+#### FAISS (primary)
+
+Stored in:
+
+```text
+gs://<bucket>/indexes/faiss/
+```
+
+Artifacts:
+
+* `index.faiss`
+* `docs.json`
+
+#### Chroma (secondary)
+
+* used for modular backend demonstration
+
+### Configuration
+
+System behavior is controlled through environment variables or Terraform-managed settings.
+
+Common configurable parameters include:
+
+* `vector_store` → faiss / chroma
+* `retriever` → configurable retrieval strategy
+* `reranker` → configurable reranking stage
+* `generator` → gemini
+* `document_source` → local / gcs
+* `top_k` → retrieval size
+* `allow_custom_models` → enable custom model selection in the UI
+
+This allows backend switching, model switching, and deployment changes without modifying the core application code.
 
 ---
 
@@ -55,33 +182,6 @@ The Streamlit interface provides an interactive front-end for submitting queries
 <p align="center">
   <img src="images/streamlit-ui-demo.png" alt="Streamlit UI Demo" width="900"/>
 </p>
-
-4. **storage**
-
-   * GCS for documents + index
-   * FAISS (primary)
-   * Chroma (secondary)
-
----
-
-## Vector storage
-
-### FAISS (primary)
-
-Stored in:
-
-```
-gs://<bucket>/indexes/faiss/
-```
-
-Artifacts:
-
-* `index.faiss`
-* `docs.json`
-
-### Chroma (secondary)
-
-* used for modular backend demonstration
 
 ---
 
@@ -98,7 +198,7 @@ cp .env.example .env.local
 
 Set:
 
-```
+```text
 GEMINI_API_KEY=your_key
 VECTOR_STORE=faiss
 DOCUMENT_SOURCE=local

@@ -33,7 +33,7 @@ The platform is implemented as a multi-service, modular Retrieval-Augmented Gene
 
 ### Services
 
-1. **rag-engine (FastAPI backend)**  
+1. **rag-engine (FastAPI backend)**
    The `rag-engine` is the core service responsible for executing the RAG pipeline. It exposes REST APIs and handles retrieval, optional reranking, and response generation.
 
    Available endpoints:
@@ -44,6 +44,8 @@ The platform is implemented as a multi-service, modular Retrieval-Augmented Gene
    * `/reload-dataset` → rebuild vector index from documents
    * `/restore-index` → restore FAISS index from storage
    * `/health` → service health check
+   * `/ready` → readiness check
+   * `/warmup` → initialize engine for cloud-friendly startup behavior
 
    RAG pipeline flow:
 
@@ -67,7 +69,26 @@ The platform is implemented as a multi-service, modular Retrieval-Augmented Gene
    }
    ```
 
-2. **mcp-server**  
+   #### Generation Layer (LLM)
+
+   The generation stage is responsible for producing the final answer from the retrieved context.
+
+   Supported modes:
+
+   * `gemini` → production LLM integration
+   * `mock` → local testing without external API dependency
+
+   Behavior:
+
+   * Retrieved Top-K documents are combined into context
+   * Prompt construction is handled internally by the RAG engine
+   * Final answer is generated using the configured LLM
+   * Model selection can be controlled via API and Streamlit UI
+   * Custom model entry can be enabled when `allow_custom_models=true`
+
+   This abstraction keeps the retrieval pipeline independent from the LLM provider and makes the system easier to extend later.
+
+2. **mcp-server**
    The `mcp-server` exposes tools using the Model Context Protocol (MCP) and interacts with the `rag-engine` internally.
 
    Tools are defined in:
@@ -94,7 +115,7 @@ The platform is implemented as a multi-service, modular Retrieval-Augmented Gene
    * Register it in the tool registry
    * Rebuild and redeploy the service
 
-3. **streamlit-ui**  
+3. **streamlit-ui**
    The Streamlit UI provides an interactive frontend for demonstrating and validating the system.
 
    Features:
@@ -112,7 +133,9 @@ The platform is implemented as a multi-service, modular Retrieval-Augmented Gene
    * FAISS (primary vector backend)
    * Chroma (secondary backend for modular backend demonstration)
 
-### Retrieval and Ranking
+---
+
+## Retrieval and Ranking
 
 The platform implements a **modular retrieval and ranking pipeline** with configurable strategies, allowing flexibility in how documents are selected and ordered before generation.
 
@@ -123,16 +146,19 @@ The platform implements a **modular retrieval and ranking pipeline** with config
 Retrieval is responsible for selecting the most relevant document chunks based on the input query.
 
 **Core Behavior:**
-- Documents are chunked and embedded during ingestion
-- Query is embedded at runtime
-- Similarity search is performed against the vector store
-- Top-K results are returned
+
+* Documents are chunked and embedded during ingestion
+* Query is embedded at runtime
+* Similarity search is performed against the vector store
+* Top-K results are returned
 
 **Key Parameter:**
-- `top_k` → controls the number of retrieved documents  
-  - Default: `3`  
-  - Exposed via API (`/query`, `/search`) and Streamlit UI  
-  - Increasing `top_k` improves recall but may introduce noise
+
+* `top_k` → controls the number of retrieved documents
+
+  * Default: `3`
+  * Exposed via API (`/query`, `/search`) and Streamlit UI
+  * Increasing `top_k` improves recall but may introduce noise
 
 ---
 
@@ -141,19 +167,22 @@ Retrieval is responsible for selecting the most relevant document chunks based o
 The system uses a **strategy-based design**, allowing retrieval methods to be swapped via configuration.
 
 #### 1. Simple Retriever
-- Dense vector similarity search using FAISS
-- Fast and efficient
-- Suitable for well-structured semantic datasets
+
+* Dense vector similarity search using FAISS
+* Fast and efficient
+* Suitable for well-structured semantic datasets
 
 #### 2. Hybrid Retriever
-- Combines multiple retrieval signals (e.g., semantic similarity + keyword relevance)
-- Improves robustness for mixed or noisy data
-- Recommended for general-purpose usage
+
+* Combines multiple retrieval signals (e.g., semantic similarity + keyword relevance)
+* Improves robustness for mixed or noisy data
+* Recommended for general-purpose usage
 
 #### 3. Metadata Retriever
-- Filters documents based on metadata fields
-- Enables structured retrieval (e.g., by source, type, or tags)
-- Used when metadata-aware queries are required
+
+* Filters documents based on metadata fields
+* Enables structured retrieval (e.g., by source, type, or tags)
+* Used when metadata-aware queries are required
 
 ---
 
@@ -161,13 +190,15 @@ The system uses a **strategy-based design**, allowing retrieval methods to be sw
 
 Retrievers operate on interchangeable vector storage backends:
 
-- **FAISS (Primary)**
-  - High-performance local vector search
-  - Used in both local and cloud deployments (with GCS persistence)
+* **FAISS (Primary)**
 
-- **Chroma (Secondary)**
-  - Included to demonstrate backend modularity
-  - Enables switching vector stores without modifying pipeline logic
+  * High-performance local vector search
+  * Used in both local and cloud deployments (with GCS persistence)
+
+* **Chroma (Secondary)**
+
+  * Included to demonstrate backend modularity
+  * Enables switching vector stores without modifying pipeline logic
 
 ---
 
@@ -176,28 +207,44 @@ Retrievers operate on interchangeable vector storage backends:
 Reranking is an optional stage that refines the ordering of retrieved documents before passing them to the LLM.
 
 **Purpose:**
-- Improve relevance of top results
-- Reduce noise introduced by retrieval
+
+* Improve relevance of top results
+* Reduce noise introduced by retrieval
 
 **Current Implementation:**
-- **Simple Reranker**
-  - Lightweight scoring-based reordering
-  - Fast and suitable for baseline improvements
+
+* **Simple Reranker**
+
+  * Lightweight scoring-based reordering
+  * Fast and suitable for baseline improvements
 
 **Design Note:**
+
 The system is designed to support future extensions such as:
-- Cross-encoder rerankers
-- LLM-based reranking
+
+* Cross-encoder rerankers
+* LLM-based reranking
 
 ---
 
-### End-to-End Retrieval Flow
+### End-to-End Request Flow
 
-1. Query is received
-2. Query embedding is generated
-3. Retriever fetches Top-K document chunks
-4. (Optional) Reranker reorders results
-5. Final context is passed to the generator (LLM)
+The system processes a query through the following stages:
+
+1. User submits query via Streamlit UI or API
+2. Request is sent to `rag-engine`
+3. Query embedding is generated
+4. Retriever fetches Top-K document chunks
+5. (Optional) Reranker reorders results
+6. Context is constructed from retrieved documents
+7. Generator (LLM) produces final answer
+8. Response returned with:
+
+   * Answer
+   * Retrieved documents
+   * Latency metrics
+
+This flow remains consistent across local, Docker, and cloud deployments.
 
 ---
 
@@ -205,12 +252,14 @@ The system is designed to support future extensions such as:
 
 This modular approach ensures:
 
-- Retrieval strategies can be changed without modifying core logic
-- Ranking improvements can be introduced independently
-- Vector backends can be swapped (FAISS ↔ Chroma ↔ managed DB)
-- System remains extensible for research and production use
+* Retrieval strategies can be changed without modifying core logic
+* Ranking improvements can be introduced independently
+* Vector backends can be swapped (FAISS ↔ Chroma ↔ managed DB)
+* System remains extensible for research and production use
 
-### Vector storage
+---
+
+### Vector Storage Layer
 
 The system uses a vector store abstraction layer to avoid coupling the RAG pipeline to a single backend.
 
@@ -229,7 +278,9 @@ Artifacts:
 
 #### Chroma (secondary)
 
-* used for modular backend demonstration
+* Used for modular backend demonstration
+
+---
 
 ### Configuration
 
@@ -237,15 +288,34 @@ System behavior is controlled through environment variables or Terraform-managed
 
 Common configurable parameters include:
 
-* `vector_store` → faiss / chroma
-* `retriever` → configurable retrieval strategy
-* `reranker` → configurable reranking stage
-* `generator` → gemini
-* `document_source` → local / gcs
+* `vector_store` → `faiss` / `chroma`
+* `retriever` → `simple` / `hybrid` / `metadata`
+* `reranker` → `none` / `simple`
+* `generator` → `gemini` / `mock`
+* `document_source` → `local` / `gcs`
 * `top_k` → retrieval size
 * `allow_custom_models` → enable custom model selection in the UI
 
 This allows backend switching, model switching, and deployment changes without modifying the core application code.
+
+---
+
+### Performance Metrics
+
+Each query response includes timing breakdowns for observability and debugging:
+
+* `retrieval_seconds`
+* `reranking_seconds`
+* `generation_seconds`
+* `total_seconds`
+
+**Purpose:**
+
+* Identify bottlenecks in the pipeline
+* Support evaluation and optimization
+* Provide transparency in production deployment
+
+These metrics are visible in API responses and the Streamlit UI.
 
 ---
 
@@ -482,9 +552,16 @@ terraform destroy
 
 ---
 
+## Design Considerations
+
+* FAISS index is persisted to GCS to avoid container-only storage
+* Retrieval and reranking are fully decoupled for extensibility
+* MCP tools are explicitly registered to ensure controlled exposure
+* System is optimized for modular deployment rather than single-script execution
+
 ## Final note
 
-This project demonstrates:
+This project demonstrates a production-ready implementation of:
 
 * modular RAG architecture
 * MCP integration

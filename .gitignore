@@ -41,3 +41,8 @@ docker/*.log
 *.bak
 *.swp.terraform/
 *.tfstate*
+
+
+evaluation/data/fiqa_subset/
+evaluation/results/
+data/documents/fiqa_*.txt

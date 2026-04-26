@@ -9,3 +9,4 @@ pypdf
 google-cloud-storage
 python-dotenv
 chromadb
+rank-bm25

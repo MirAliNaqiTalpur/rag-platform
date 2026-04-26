@@ -130,7 +130,7 @@ def reload_backend_dataset(
         "vector_store": vector_store,
         "retriever": retriever,
         "reranker": reranker,
-        "generator": "gemini",
+        "generator": os.getenv("GENERATOR", "gemini").lower(),
         "top_k": int(top_k),
         "default_model": final_model,
         "available_models": ",".join(available_models),
@@ -192,7 +192,7 @@ with st.sidebar:
         index=vector_store_index,
     )
 
-    retriever_options = ["simple", "hybrid", "metadata"]
+    retriever_options = ["simple", "hybrid", "metadata", "bm25"]
     default_retriever = os.getenv("RETRIEVER", "hybrid").lower()
     retriever_index = (
         retriever_options.index(default_retriever)
@@ -205,7 +205,7 @@ with st.sidebar:
         index=retriever_index,
     )
 
-    reranker_options = ["none", "simple"]
+    reranker_options = ["none", "simple", "cross_encoder"]
     default_reranker = os.getenv("RERANKER", "simple").lower()
     reranker_index = (
         reranker_options.index(default_reranker)
@@ -218,7 +218,8 @@ with st.sidebar:
         index=reranker_index,
     )
 
-    st.markdown("**Generator:** Gemini")
+    generator = os.getenv("GENERATOR", "gemini").lower()
+    st.markdown(f"**Generator:** {generator}")
 
     top_k = st.number_input(
         "Top K",
@@ -363,7 +364,9 @@ with col2:
     run_search = st.button("Search Only", use_container_width=True)
 
 if run_query or run_search:
-    if not os.getenv("GEMINI_API_KEY", "").strip():
+    generator = os.getenv("GENERATOR", "gemini").lower()
+
+    if generator == "gemini" and not os.getenv("GEMINI_API_KEY", "").strip():
         st.error("GEMINI_API_KEY is not set in the environment.")
     else:
         try:

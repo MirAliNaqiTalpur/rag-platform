@@ -3,7 +3,7 @@ from app.rag.retriever import DenseRetriever
 from app.rag.simple_retriever import SimpleRetriever
 from app.rag.metadata_retriever import MetadataAwareRetriever
 from app.rag.bm25_retriever import BM25Retriever
-from app.rag.cross_encoder_reranker import CrossEncoderReranker
+
 
 
 class RetrieverRegistry:

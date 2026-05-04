@@ -1,35 +1,70 @@
 # Modular MCP-Enabled RAG Platform
 
-> A cloud-agnostic, modular RAG infrastructure platform with MCP integration, designed for reproducible deployment using Docker and Terraform.
+> A handoff-ready, cloud-oriented Retrieval-Augmented Generation (RAG) platform with Model Context Protocol (MCP) integration, configurable retrieval strategies, evaluation scripts, and Terraform-based deployment support.
 
-A production-oriented, modular Retrieval-Augmented Generation (RAG) platform with a Model Context Protocol (MCP) server interface, pluggable retrieval and reranking strategies, interchangeable vector backends, and Terraform-based cloud deployment.
+This repository contains a modular RAG infrastructure platform developed as part of an internship project. The platform is designed to support protocol-based tool exposure, configurable retrieval and reranking, interchangeable storage backends, reproducible evaluation, and deployment on Google Cloud Platform using Docker and Terraform.
 
 ---
 
 ## Project overview
 
-This repository implements a cloud-agnostic RAG infrastructure layer designed for reusable deployment across document-centric AI systems.
+The platform is built as a reusable infrastructure layer for document-centric and agentic AI systems. Instead of implementing RAG as a single monolithic script, the project separates retrieval, reranking, generation, MCP tool exposure, storage, evaluation, and deployment into configurable components.
 
-The platform is built around four separable concerns:
+The main system components are:
 
-* **MCP server** for protocol-based tool exposure
-* **RAG engine** for retrieval, reranking, and generation
-* **Vector storage abstraction** for backend switching
-* **Evaluation-ready structure** for experimentation
+* **RAG engine** for retrieval, optional reranking, context construction, and answer generation
+* **MCP server** for protocol-based tool exposure to external agents and clients
+* **Streamlit UI** for interactive validation and demonstration
+* **Vector storage abstraction** for switching between vector backends
+* **Document ingestion layer** for local and Google Cloud Storage-backed document loading
+* **Evaluation module** for retrieval benchmarking and LLM-as-a-Judge generation-quality assessment
+* **Terraform deployment templates** for reproducible Google Cloud Platform deployment
 
-Validated for:
+Validated workflows include:
 
 * local execution
 * Docker Compose deployment
-* Terraform-based Cloud Run deployment
-* GCS-backed document loading
-* FAISS persistence on GCS
+* MCP tool invocation
+* Streamlit UI validation
+* Google Cloud Storage-backed document loading
+* FAISS index persistence on Google Cloud Storage
+* Cloud Run-oriented deployment using Terraform
+* FiQA-2018 retrieval evaluation
+* LLM-as-a-Judge answer-quality evaluation
+
+The project is intended as a research-grade and handoff-ready foundation for extending RAG systems toward more modular, cloud-deployable, and agent-compatible architectures.
 
 ---
 
-## Architecture Overview
+## Architecture overview
 
-The platform is implemented as a multi-service, modular Retrieval-Augmented Generation (RAG) system. Each component is independently deployable and configurable, enabling clear separation of concerns between retrieval, ranking, tool interaction, and generation. This design allows the system to be reproducible across local and cloud environments while remaining extensible.
+The platform is organized as three main runtime services plus shared storage and evaluation utilities.
+
+                         ┌────────────────────┐
+                         │    Streamlit UI     │
+                         │  validation/demo    │
+                         └─────────┬──────────┘
+                                   │ HTTP
+                                   ▼
+                         ┌────────────────────┐
+                         │     RAG Engine      │
+                         │ retrieval + answer  │
+                         └───────┬─────┬──────┘
+                                 │     │
+                ┌────────────────┘     └────────────────┐
+                ▼                                       ▼
+       ┌─────────────────┐                    ┌─────────────────┐
+       │ Vector Store     │                    │ Generator Model  │
+       │ FAISS / memory   │                    │ Gemini / mock    │
+       └─────────────────┘                    └─────────────────┘
+
+                         ┌────────────────────┐
+                         │     MCP Server      │
+                         │ protocol tool layer │
+                         └─────────┬──────────┘
+                                   │
+                                   ▼
+                         External MCP clients
 
 ### Services
 
@@ -65,7 +100,7 @@ The platform is implemented as a multi-service, modular Retrieval-Augmented Gene
    {
      "query": "What is MCP?",
      "top_k": 3,
-     "model": "gemini-3-flash-preview"
+     "model": "gemini-2.5-flash-lite"
    }
    ```
 
@@ -164,25 +199,33 @@ Retrieval is responsible for selecting the most relevant document chunks based o
 
 ### Available Retrieval Strategies
 
-The system uses a **strategy-based design**, allowing retrieval methods to be swapped via configuration.
+The system uses a **strategy-based design**, allowing retrieval methods to be swapped via the `RETRIEVER` environment variable. Four retrievers are registered:
 
-#### 1. Simple Retriever
+#### 1. Dense Retriever (`dense`)
 
-* Dense vector similarity search using FAISS
-* Fast and efficient
-* Suitable for well-structured semantic datasets
+* Dense vector similarity search using FAISS over `all-MiniLM-L6-v2` sentence-transformer embeddings
+* Strongest configuration on the FiQA-2018 benchmark used for empirical evaluation
+* Lowest steady-state latency among the registered retrievers
+* Default and recommended configuration for general-purpose use
 
-#### 2. Hybrid Retriever
+#### 2. BM25 Retriever (`bm25`)
 
-* Combines multiple retrieval signals (e.g., semantic similarity + keyword relevance)
-* Improves robustness for mixed or noisy data
-* Recommended for general-purpose usage
+* Sparse lexical retrieval based on the Okapi BM25 ranking function
+* Paradigm-distinct baseline against dense semantic methods
+* Useful for queries with high lexical specificity (identifiers, codes, citations)
+* First-query cold-start cost includes one-time inverted-index construction; subsequent queries are fast
 
-#### 3. Metadata Retriever
+#### 3. Hybrid Retriever (`hybrid`)
 
-* Filters documents based on metadata fields
-* Enables structured retrieval (e.g., by source, type, or tags)
-* Used when metadata-aware queries are required
+* Reciprocal Rank Fusion (RRF) combination of dense and BM25 ranked lists
+* Smoothing constant `k = 60` (standard convention)
+* Performance depends on the relative quality of the two component retrievers; see Bruch et al. (2023) for fusion behavior under quality asymmetry
+
+#### 4. Metadata Retriever (`metadata`)
+
+* Filters documents by structured metadata fields
+* Registered and unit-tested but not part of the FiQA empirical evaluation, since FiQA does not provide metadata-typed queries
+* Intended for downstream evaluation on AIBL's internal corpus
 
 ---
 
@@ -204,28 +247,37 @@ Retrievers operate on interchangeable vector storage backends:
 
 ### Reranking Layer
 
-Reranking is an optional stage that refines the ordering of retrieved documents before passing them to the LLM.
+Reranking is an optional stage that refines the ordering of retrieved documents before passing them to the LLM. The reranker is selected via the `RERANKER` environment variable. Three rerankers are registered:
 
-**Purpose:**
+#### 1. None (`none`)
 
-* Improve relevance of top results
-* Reduce noise introduced by retrieval
+* Passthrough — preserves the retriever's original ranking
+* Default; recommended for latency-sensitive workloads on a strong first-stage retriever
 
-**Current Implementation:**
+#### 2. Simple Lexical Reranker (`simple`)
 
-* **Simple Reranker**
+* Lightweight reordering based on query-token set intersection
+* Adds only a few milliseconds of latency
+* Useful baseline for quick lexical-overlap reordering
 
-  * Lightweight scoring-based reordering
-  * Fast and suitable for baseline improvements
+#### 3. Cross-Encoder Reranker (`cross_encoder`)
 
-**Design Note:**
-
-The system is designed to support future extensions such as:
-
-* Cross-encoder rerankers
-* LLM-based reranking
+* Neural reranker based on `cross-encoder/ms-marco-MiniLM-L-6-v2`
+* Joint encoding of `(query, document)` pairs for fine-grained relevance scoring
+* Adds approximately 350 milliseconds of latency per query (≈ 50× the bare retrieval cost)
+* Empirically improves weak first-stage retrievers (e.g., BM25); statistically neutral on strong dense first stages — see the project report for full ablation results
 
 ---
+
+---
+
+### Empirical Evaluation Reference
+
+The retriever and reranker components have been empirically evaluated on the FiQA-2018 benchmark across nine configurations (3 retrievers × 3 rerankers). The evaluation includes paired Wilcoxon significance testing with Bonferroni correction, per-query failure-mode analysis, and an LLM-as-a-Judge generation-quality assessment.
+
+Headline finding: the `dense + none` configuration is the strongest by `nDCG@10` and the lowest-latency configuration on this benchmark. Full results, statistical tests, and per-workload recommendations are reported in the project report (Chapters 6 and 7).
+
+Evaluation outputs (raw metrics, statistical-test tables, judge transcripts) are available under `eval_phase_4/` and `eval_phase_5/`.
 
 ### End-to-End Request Flow
 

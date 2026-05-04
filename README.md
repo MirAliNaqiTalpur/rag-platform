@@ -269,7 +269,6 @@ Reranking is an optional stage that refines the ordering of retrieved documents 
 
 ---
 
----
 
 ### Empirical Evaluation Reference
 
